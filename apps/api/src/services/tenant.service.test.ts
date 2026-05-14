@@ -3,7 +3,7 @@ import { adminPool, tenantPool } from "../db/pool";
 import { withAdmin } from "../db/withTenant";
 import { AppError } from "../lib/errors";
 import { verifyPassword } from "../lib/password";
-import { createTenant, getTenant, listAuditLog, listTenants, setTenantStatus } from "./tenant.service";
+import { createTenant, getTenant, listAuditLog, listTenants, platformStats, setTenantStatus } from "./tenant.service";
 
 const { provisioningQueueAdd } = vi.hoisted(() => ({
   provisioningQueueAdd: vi.fn(),
@@ -140,6 +140,43 @@ describeWithDatabase("tenant.service", () => {
     });
 
     expect(actions).toEqual(["tenant.create", "tenant.suspended"]);
+  });
+
+  it("returns total tenants, sector breakdown, and recent registrations", async () => {
+    const adminId = await createPlatformAdmin();
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const grosirTenant = await createTenant(
+      {
+        name: "Stats Grosir",
+        slug: `stats-grosir-${suffix}`,
+        sector: "grosir",
+        ownerEmail: `stats-grosir-${suffix}@example.test`,
+        ownerPassword: "secret123",
+      },
+      adminId,
+    );
+    const retailTenant = await createTenant(
+      {
+        name: "Stats Retail",
+        slug: `stats-retail-${suffix}`,
+        sector: "retail",
+        ownerEmail: `stats-retail-${suffix}@example.test`,
+        ownerPassword: "secret123",
+      },
+      adminId,
+    );
+
+    const stats = await platformStats();
+
+    expect(stats.total).toBeGreaterThanOrEqual(2);
+    expect(stats.bySector).toEqual(
+      expect.arrayContaining([
+        { sector: "grosir", n: expect.any(Number) },
+        { sector: "retail", n: expect.any(Number) },
+      ]),
+    );
+    expect(stats.recent.map((tenant) => tenant.id)).toEqual(expect.arrayContaining([grosirTenant.id, retailTenant.id]));
+    expect(stats.recent).toHaveLength(Math.min(stats.total, 5));
   });
 
   it("returns 404 for missing tenant get and status update", async () => {

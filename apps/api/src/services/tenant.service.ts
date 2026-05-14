@@ -26,6 +26,12 @@ export type TenantDetail = TenantRow & {
   owner: TenantUserRow;
 };
 
+export interface PlatformStats {
+  total: number;
+  bySector: { sector: Sector; n: number }[];
+  recent: TenantRow[];
+}
+
 export interface TenantListFilter {
   status?: TenantStatus;
   search?: string;
@@ -95,6 +101,30 @@ export async function createTenant(input: RegisterTenantInput, adminId: string):
     }
     throw error;
   }
+}
+
+export async function platformStats(): Promise<PlatformStats> {
+  return withAdmin(async (q) => {
+    const totalResult = await q<{ n: number }>("select count(*)::int as n from tenants");
+    const bySectorResult = await q<{ sector: Sector; n: number }>(
+      `select sector, count(*)::int as n
+       from tenants
+       group by sector
+       order by n desc, sector asc`,
+    );
+    const recentResult = await q<TenantRow>(
+      `select id, name, slug, sector, status, created_at
+       from tenants
+       order by created_at desc
+       limit 5`,
+    );
+
+    return {
+      total: totalResult.rows[0]?.n ?? 0,
+      bySector: bySectorResult.rows,
+      recent: recentResult.rows,
+    };
+  });
 }
 
 export async function listTenants(filter: TenantListFilter = {}): Promise<TenantRow[]> {

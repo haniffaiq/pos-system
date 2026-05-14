@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { app as mountedApp } from "../index";
 import { signAccess } from "../lib/jwt";
 import { onError } from "../middleware/error";
-import { createTenant, getTenant, listAuditLog, listTenants, setTenantStatus } from "../services/tenant.service";
+import { createTenant, getTenant, listAuditLog, listTenants, platformStats, setTenantStatus } from "../services/tenant.service";
 import { adminRoutes } from "./admin.routes";
 
 vi.mock("../services/tenant.service", () => ({
@@ -12,6 +12,7 @@ vi.mock("../services/tenant.service", () => ({
   listTenants: vi.fn(),
   listAuditLog: vi.fn(),
   getTenant: vi.fn(),
+  platformStats: vi.fn(),
   setTenantStatus: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ const createTenantMock = vi.mocked(createTenant);
 const listTenantsMock = vi.mocked(listTenants);
 const listAuditLogMock = vi.mocked(listAuditLog);
 const getTenantMock = vi.mocked(getTenant);
+const platformStatsMock = vi.mocked(platformStats);
 const setTenantStatusMock = vi.mocked(setTenantStatus);
 
 function testApp() {
@@ -90,6 +92,51 @@ describe("admin routes", () => {
       },
     ]);
     expect(listTenantsMock).toHaveBeenCalledWith({ status: "active", search: "admin" });
+  });
+
+  it("returns platform stats for a platform admin", async () => {
+    const token = await platformAdminToken();
+    platformStatsMock.mockResolvedValueOnce({
+      total: 2,
+      bySector: [
+        { sector: "grosir", n: 1 },
+        { sector: "retail", n: 1 },
+      ],
+      recent: [
+        {
+          id: "tenant-1",
+          name: "Recent Grosir",
+          slug: "recent-grosir",
+          sector: "grosir",
+          status: "active",
+          created_at: new Date("2026-05-14T00:00:00.000Z"),
+        },
+      ],
+    });
+
+    const response = await testApp().request("/api/v1/admin/stats", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      total: 2,
+      bySector: [
+        { sector: "grosir", n: 1 },
+        { sector: "retail", n: 1 },
+      ],
+      recent: [
+        {
+          id: "tenant-1",
+          name: "Recent Grosir",
+          slug: "recent-grosir",
+          sector: "grosir",
+          status: "active",
+          created_at: "2026-05-14T00:00:00.000Z",
+        },
+      ],
+    });
+    expect(platformStatsMock).toHaveBeenCalledOnce();
   });
 
   it("rejects invalid tenant list filters with 400", async () => {

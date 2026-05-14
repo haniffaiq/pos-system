@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { authMiddleware } from "../middleware/auth";
 import { requireRole } from "../middleware/requireRole";
-import { createTenant, getTenant, listAuditLog, listTenants, setTenantStatus } from "../services/tenant.service";
+import { createTenant, getTenant, listAuditLog, listTenants, platformStats, setTenantStatus } from "../services/tenant.service";
 
 const tenantListFilterSchema = z.object({
   status: z.enum(["active", "suspended"]).optional(),
@@ -15,6 +15,8 @@ const tenantIdSchema = z.string().uuid();
 export const adminRoutes = new Hono();
 
 adminRoutes.use("*", authMiddleware, requireRole("platform_admin"));
+
+adminRoutes.get("/stats", async (c) => c.json(await platformStats()));
 
 adminRoutes.get("/tenants", async (c) => {
   const filter = tenantListFilterSchema.parse({
