@@ -6,6 +6,7 @@ import { adjustmentsRoutes } from "./adjustments.routes";
 import { masterdataRoutes } from "./masterdata.routes";
 import { notificationsRoutes } from "./notifications.routes";
 import { productsRoutes } from "./products.routes";
+import { stockInRoutes } from "./stockin.routes";
 
 /**
  * Base router for the grosir module. The tenant router already ran auth,
@@ -21,10 +22,10 @@ grosirRouter.use("*", authMiddleware);
 
 grosirRouter.route("/masterdata", masterdataRoutes);
 grosirRouter.route("/products", productsRoutes);
+grosirRouter.route("/stock-in", stockInRoutes);
 grosirRouter.route("/adjustments", adjustmentsRoutes);
 
 // Sub-routers are mounted here in later tasks:
-// grosirRouter.route("/stock-in", stockInRoutes);
 // grosirRouter.route("/sales", salesRoutes);
 // grosirRouter.route("/dashboard", dashboardRoutes);
 // grosirRouter.route("/reports", reportsRoutes);
