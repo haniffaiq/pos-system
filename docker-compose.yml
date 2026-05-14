@@ -1,0 +1,100 @@
+name: operational-web-app
+
+x-api-build: &api-build
+  context: .
+  dockerfile: apps/api/Dockerfile
+
+x-app-environment: &app-environment
+  NODE_ENV: development
+  DATABASE_URL: ${DATABASE_URL}
+  DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL}
+  REDIS_URL: ${REDIS_URL}
+  JWT_SECRET: ${JWT_SECRET}
+  ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS}
+  REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS}
+  INVITE_TOKEN_TTL_SECONDS: ${INVITE_TOKEN_TTL_SECONDS}
+  PASSWORD_RESET_TOKEN_TTL_SECONDS: ${PASSWORD_RESET_TOKEN_TTL_SECONDS}
+  SMTP_HOST: ${SMTP_HOST}
+  SMTP_PORT: ${SMTP_PORT}
+  SMTP_SECURE: ${SMTP_SECURE}
+  SMTP_USER: ${SMTP_USER}
+  SMTP_PASSWORD: ${SMTP_PASSWORD}
+  MAIL_FROM: ${MAIL_FROM}
+  EXPORT_DIR: ${EXPORT_DIR}
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: *api-build
+    command: node dist/index.js
+    environment: *app-environment
+    ports:
+      - "${API_PORT}:4000"
+    volumes:
+      - exports:${EXPORT_DIR}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: *api-build
+    command: node dist/worker.js
+    environment: *app-environment
+    volumes:
+      - exports:${EXPORT_DIR}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "${WEB_PORT}:3000"
+    depends_on:
+      api:
+        condition: service_started
+
+  mailhog:
+    image: mailhog/mailhog
+    profiles:
+      - dev
+    ports:
+      - "${MAILHOG_WEB_PORT}:8025"
+      - "1025:1025"
+
+volumes:
+  exports:
