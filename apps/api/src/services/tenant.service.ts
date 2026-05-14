@@ -2,6 +2,7 @@ import type { RegisterTenantInput, Role, Sector, TenantStatus } from "@app/share
 import { withAdmin, type Query } from "../db/withTenant";
 import { AppError } from "../lib/errors";
 import { hashPassword } from "../lib/password";
+import { provisioningQueue } from "../queue/queues";
 
 export interface TenantRow {
   id: string;
@@ -50,7 +51,7 @@ export async function createTenant(input: RegisterTenantInput, adminId: string):
   const passwordHash = await hashPassword(input.ownerPassword);
 
   try {
-    return await withAdmin(async (q) => {
+    const tenant = await withAdmin(async (q) => {
       const duplicate = await q("select 1 from tenants where slug = $1", [input.slug]);
       if (duplicate.rowCount) {
         throw slugTakenError();
@@ -73,6 +74,9 @@ export async function createTenant(input: RegisterTenantInput, adminId: string):
 
       return tenant;
     });
+
+    await provisioningQueue.add("provision", { tenantId: tenant.id });
+    return tenant;
   } catch (error) {
     if (error instanceof AppError) {
       throw error;
