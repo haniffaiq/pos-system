@@ -1,6 +1,6 @@
--- dev-only: one platform admin (password: "admin123").
--- Seed execution is owned by the auth/register flow in a later task; this file
--- documents the local quick-start identity without committing a placeholder hash.
--- Local quick start once password hashing is wired into seeding:
---   insert into platform_admins(email, password_hash, name)
---   values ('admin@local', generated_argon2_hash, 'Local Admin');
+-- Local super-admin quick start for manual/e2e flows:
+--   docker compose --profile dev up -d && pnpm migrate
+--   pnpm seed:admin admin@local admin123 "Local Admin"
+-- Then sign in at /admin/login with admin@local / admin123, register a tenant,
+-- and verify the welcome email in MailHog at http://localhost:8025.
+-- The seed helper hashes the password at runtime; no placeholder hash is committed.
