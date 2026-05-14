@@ -64,5 +64,11 @@ tenantRoutes.all("/:tenantId/m/*", async (c) => {
     );
   }
 
-  return mod.router.fetch(c.req.raw, c.env);
+  const url = new URL(c.req.url);
+  const modulePrefix = `/api/v1/t/${c.req.param("tenantId")}/m`;
+  url.pathname = url.pathname.startsWith(modulePrefix)
+    ? (url.pathname.slice(modulePrefix.length) || "/")
+    : url.pathname;
+
+  return mod.router.fetch(new Request(url, c.req.raw), c.env);
 });
