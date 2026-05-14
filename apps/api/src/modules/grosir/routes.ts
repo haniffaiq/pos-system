@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { authMiddleware } from "../../middleware/auth";
 import { masterdataRoutes } from "./masterdata.routes";
 import { notificationsRoutes } from "./notifications.routes";
+import { productsRoutes } from "./products.routes";
 
 /**
  * Base router for the grosir module. The tenant router already ran auth,
@@ -18,9 +19,9 @@ export const grosirRouter = new Hono<{
 grosirRouter.use("*", authMiddleware);
 
 grosirRouter.route("/masterdata", masterdataRoutes);
+grosirRouter.route("/products", productsRoutes);
 
 // Sub-routers are mounted here in later tasks:
-// grosirRouter.route("/products", productsRoutes);
 // grosirRouter.route("/stock-in", stockInRoutes);
 // grosirRouter.route("/sales", salesRoutes);
 // grosirRouter.route("/adjustments", adjustmentsRoutes);
