@@ -80,7 +80,11 @@ describeWithDatabase("tenant.service", () => {
     expect(stored.owner.password_hash).not.toBe("secret123");
     await expect(verifyPassword(stored.owner.password_hash, "secret123")).resolves.toBe(true);
     expect(stored.audit).toEqual([{ action: "tenant.create", target: tenant.id }]);
-    expect(provisioningQueueAdd).toHaveBeenCalledWith("provision", { tenantId: tenant.id });
+    expect(provisioningQueueAdd).toHaveBeenCalledWith(
+      "provision",
+      { tenantId: tenant.id },
+      { jobId: `tenant-provisioning-${tenant.id}` },
+    );
   });
 
   it("rejects a duplicate slug with 409", async () => {

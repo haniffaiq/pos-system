@@ -75,7 +75,7 @@ export async function createTenant(input: RegisterTenantInput, adminId: string):
       return tenant;
     });
 
-    await provisioningQueue.add("provision", { tenantId: tenant.id });
+    await provisioningQueue.add("provision", { tenantId: tenant.id }, { jobId: `tenant-provisioning-${tenant.id}` });
     return tenant;
   } catch (error) {
     if (error instanceof AppError) {
