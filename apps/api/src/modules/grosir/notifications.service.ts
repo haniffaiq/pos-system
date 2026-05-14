@@ -6,6 +6,7 @@ export interface NotificationRow {
   type: "low_stock";
   title: string;
   body: string | null;
+  metadata: Record<string, unknown>;
   is_read: boolean;
   created_at: Date;
 }
@@ -14,15 +15,16 @@ export interface CreateNotificationInput {
   type: "low_stock";
   title: string;
   body?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 export function createNotification(tenantId: string, input: CreateNotificationInput): Promise<NotificationRow> {
   return withTenant(tenantId, async (q) => {
     const result = await q<NotificationRow>(
-      `insert into notifications (tenant_id, type, title, body)
-       values (current_setting('app.current_tenant_id')::uuid, $1, $2, $3)
-       returning id, type, title, body, is_read, created_at`,
-      [input.type, input.title, input.body ?? null],
+      `insert into notifications (tenant_id, type, title, body, metadata)
+       values (current_setting('app.current_tenant_id')::uuid, $1, $2, $3, $4::jsonb)
+       returning id, type, title, body, metadata, is_read, created_at`,
+      [input.type, input.title, input.body ?? null, JSON.stringify(input.metadata ?? {})],
     );
     return result.rows[0]!;
   });
@@ -35,7 +37,7 @@ export function listNotifications(
   return withTenant(tenantId, async (q) => {
     const unreadWhere = filter.unreadOnly ? " where is_read = false" : "";
     const result = await q<NotificationRow>(
-      `select id, type, title, body, is_read, created_at
+      `select id, type, title, body, metadata, is_read, created_at
        from notifications${unreadWhere}
        order by created_at desc, id desc
        limit 100`,

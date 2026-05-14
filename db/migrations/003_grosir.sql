@@ -160,6 +160,7 @@ create table notifications (
   type text not null check (type in ('low_stock')),
   title text not null,
   body text,
+  metadata jsonb not null default '{}',
   is_read boolean not null default false,
   created_at timestamptz not null default now(),
   unique (tenant_id, id)
@@ -197,4 +198,7 @@ create index stock_in_tenant_created_at_idx on stock_in (tenant_id, created_at);
 create index stock_movements_tenant_product_created_at_idx on stock_movements (tenant_id, product_id, created_at);
 create index sales_tenant_created_at_idx on sales (tenant_id, created_at);
 create index notifications_tenant_unread_idx on notifications (tenant_id, is_read, created_at);
+create unique index notifications_unread_low_stock_product_idx
+  on notifications (tenant_id, type, (metadata->>'product_id'))
+  where type = 'low_stock' and is_read = false and metadata ? 'product_id';
 create index export_jobs_tenant_status_idx on export_jobs (tenant_id, status, created_at);
