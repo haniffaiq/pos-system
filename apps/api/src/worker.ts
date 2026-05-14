@@ -2,6 +2,7 @@ import { Worker, type Job, type Processor, type WorkerOptions } from "bullmq";
 
 import { redis } from "./lib/redis";
 import { emailProcessor } from "./queue/jobs/email";
+import { exportProcessor } from "./queue/jobs/exportGeneration";
 import { lowStockProcessor } from "./queue/jobs/lowStockScan";
 import { provisioningProcessor } from "./queue/jobs/provisioning";
 import {
@@ -20,9 +21,7 @@ const workerOptions: WorkerOptions = {
   prefix: process.env.BULLMQ_QUEUE_PREFIX,
 };
 
-const exportGenerationProcessor: Processor<ExportGenerationJob> = async () => {
-  // Phase 2 wires report CSV generation.
-};
+const exportGenerationProcessor: Processor<ExportGenerationJob> = exportProcessor;
 
 function logFailedJob(queueName: string, job: Job | undefined, error: Error): void {
   console.error("worker job failed", {

@@ -7,6 +7,7 @@ import { dashboardRoutes } from "./dashboard.routes";
 import { masterdataRoutes } from "./masterdata.routes";
 import { notificationsRoutes } from "./notifications.routes";
 import { productsRoutes } from "./products.routes";
+import { reportsRoutes } from "./reports.routes";
 import { salesRoutes } from "./sales.routes";
 import { stockInRoutes } from "./stockin.routes";
 
@@ -28,7 +29,5 @@ grosirRouter.route("/stock-in", stockInRoutes);
 grosirRouter.route("/sales", salesRoutes);
 grosirRouter.route("/adjustments", adjustmentsRoutes);
 grosirRouter.route("/dashboard", dashboardRoutes);
-
-// Sub-routers are mounted here in later tasks:
-// grosirRouter.route("/reports", reportsRoutes);
+grosirRouter.route("/reports", reportsRoutes);
 grosirRouter.route("/notifications", notificationsRoutes);
