@@ -40,7 +40,31 @@ export default function TenantLayout({ children, params }: Props) {
           <Link href={`/t/${params.slug}`} className="block font-display font-bold">
             Dashboard
           </Link>
-          {/* Grosir module links are injected in Phase 2. */}
+          {ctx?.sector === "grosir" && (
+            <>
+              <Link href={`/t/${params.slug}/pos`} className="block font-display font-bold">
+                POS / Penjualan
+              </Link>
+              <Link href={`/t/${params.slug}/products`} className="block font-display font-bold">
+                Produk
+              </Link>
+              <Link href={`/t/${params.slug}/stock-in`} className="block font-display font-bold">
+                Barang Masuk
+              </Link>
+              <Link href={`/t/${params.slug}/adjustments`} className="block font-display font-bold">
+                Penyesuaian Stok
+              </Link>
+              <Link href={`/t/${params.slug}/masterdata`} className="block font-display font-bold">
+                Master Data
+              </Link>
+              <Link href={`/t/${params.slug}/reports`} className="block font-display font-bold">
+                Laporan
+              </Link>
+              <Link href={`/t/${params.slug}/notifications`} className="block font-display font-bold">
+                Notifikasi
+              </Link>
+            </>
+          )}
         </aside>
         <main className="flex-1 p-6" data-sector={ctx?.sector}>
           {children}
