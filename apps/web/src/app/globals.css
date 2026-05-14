@@ -1,0 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700;900&family=Inter:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { background: #f5f5f5; color: #222222; font-family: Inter, sans-serif; }
+h1, h2, h3, h4, button, label { font-family: 'Space Grotesk', sans-serif; }
