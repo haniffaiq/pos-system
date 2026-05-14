@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { getSession } from "@/lib/auth";
 
 interface RequireRoleProps {
-  role: string;
+  role: string | string[];
   redirect: string;
   children: ReactNode;
 }
@@ -16,7 +16,9 @@ export function RequireRole({ role, redirect, children }: RequireRoleProps) {
 
   useEffect(() => {
     const session = getSession();
-    if (!session || session.role !== role) {
+    const allowed = Array.isArray(role) ? role : [role];
+
+    if (!session || !allowed.includes(session.role)) {
       setOk(false);
       router.replace(redirect);
       return;
