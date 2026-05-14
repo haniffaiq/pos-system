@@ -13,6 +13,21 @@ describe("api app skeleton", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
   });
+
+  it("allows browser clients to call the API from the web origin", async () => {
+    const response = await app.request("/api/v1/auth/admin-login", {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:3000",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type,authorization",
+      },
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:3000");
+    expect(response.headers.get("access-control-allow-headers")).toContain("authorization");
+  });
 });
 
 describe("Hono error middleware", () => {

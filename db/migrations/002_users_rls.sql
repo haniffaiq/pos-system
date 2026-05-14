@@ -1,11 +1,22 @@
 -- DB roles. app_admin bypasses RLS for platform queries.
+-- Fresh compose databases create app_admin in db/init before migrations so the
+-- migration runner can connect as app_admin without needing superuser-only role
+-- changes. When a superuser/owner runs this migration directly, keep the role
+-- bootstrap path idempotent for older local databases.
 do $$ begin
-  if not exists (select from pg_roles where rolname = 'app_admin') then
-    create role app_admin login password 'admin_dev_pw' bypassrls;
+  if current_user <> 'app_admin' then
+    if not exists (select from pg_roles where rolname = 'app') then
+      create role app login password 'app_dev_pw' nobypassrls;
+    end if;
+
+    if not exists (select from pg_roles where rolname = 'app_admin') then
+      create role app_admin login password 'admin_dev_pw' bypassrls;
+    end if;
+
+    alter role app with login password 'app_dev_pw' nobypassrls;
+    alter role app_admin with login password 'admin_dev_pw' bypassrls;
   end if;
 end $$;
-
-alter role app_admin with login password 'admin_dev_pw' bypassrls;
 
 grant all on all tables in schema public to app_admin;
 alter default privileges in schema public grant all on tables to app_admin;

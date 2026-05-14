@@ -9,9 +9,10 @@ x-app-environment: &app-environment
   DATABASE_URL: ${DATABASE_URL}
   DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL}
   REDIS_URL: ${REDIS_URL}
-  JWT_SECRET: ${JWT_SECRET}
-  ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS}
-  REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+  ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL}
+  REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL}
   INVITE_TOKEN_TTL_SECONDS: ${INVITE_TOKEN_TTL_SECONDS}
   PASSWORD_RESET_TOKEN_TTL_SECONDS: ${PASSWORD_RESET_TOKEN_TTL_SECONDS}
   SMTP_HOST: ${SMTP_HOST}
@@ -24,15 +25,20 @@ x-app-environment: &app-environment
 
 services:
   db:
-    image: postgres:16
+    image: docker.io/library/postgres:16
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+      POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER}
+      POSTGRES_ADMIN_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - ./db/data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -40,7 +46,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7
+    image: docker.io/library/redis:7
     ports:
       - "6379:6379"
     healthcheck:
@@ -91,7 +97,7 @@ services:
       retries: 10
 
   mailhog:
-    image: mailhog/mailhog
+    image: docker.io/mailhog/mailhog
     profiles:
       - dev
     ports:

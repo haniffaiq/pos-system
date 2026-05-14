@@ -34,11 +34,16 @@ function loginErrorMessage(error: unknown): string {
 export function LoginForm({ mode, slug }: Props) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
+
+  React.useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   async function onSubmit(values: LoginInput) {
     setServerError(null);
@@ -80,7 +85,7 @@ export function LoginForm({ mode, slug }: Props) {
           error={errors.password?.message}
         />
         {serverError && <p className="text-sm font-bold text-accent">{serverError}</p>}
-        <Button type="submit" variant="primary" disabled={isSubmitting} className="w-full justify-center">
+        <Button type="submit" variant="primary" disabled={!isHydrated || isSubmitting} className="w-full justify-center">
           {isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
       </form>

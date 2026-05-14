@@ -5,7 +5,8 @@
     "dev": "docker compose --profile dev up --build",
     "migrate": "tsx db/migrate.ts",
     "seed:admin": "tsx db/seeds/seed-admin.ts",
-    "test": "pnpm -r test"
+    "test": "pnpm -r --filter './apps/*' --filter './packages/*' test",
+    "test:e2e": "pnpm --filter @app/e2e test"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
