@@ -8,6 +8,11 @@ vi.mock("@/lib/tenant", () => ({
   fetchTenantContext: vi.fn(),
 }));
 
+vi.mock("@/lib/grosir", () => ({
+  grosirApi: vi.fn(),
+}));
+
+import { grosirApi } from "@/lib/grosir";
 import { fetchTenantContext } from "@/lib/tenant";
 
 function renderWithQuery(ui: React.ReactElement) {
@@ -36,16 +41,71 @@ describe("tenant dashboard", () => {
     expect(screen.getByText(/module is not available yet/i)).toBeTruthy();
   });
 
-  it("keeps the grosir placeholder wired for the Phase 2 module", async () => {
+  it("renders grosir dashboard totals and top products for manager tenants", async () => {
     vi.mocked(fetchTenantContext).mockResolvedValue({
       userId: "user-2",
       tenantId: "tenant-2",
       role: "manager",
       sector: "grosir",
     });
+    vi.mocked(grosirApi).mockResolvedValue({
+      todaySalesTotal: 125000,
+      todayTxnCount: 7,
+      lowStockCount: 3,
+      topProducts: [
+        { product_id: "prod-beras", name: "Beras Ramos", qty_sold: 12 },
+        { product_id: "prod-gula", name: "Gula Pasir", qty_sold: 5 },
+      ],
+    });
 
     renderWithQuery(<TenantDashboard />);
 
-    expect(await screen.findByText("Grosir module loads here (Phase 2)." )).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeTruthy();
+    expect(screen.getByText("Penjualan hari ini")).toBeTruthy();
+    expect(screen.getByText("Rp 125.000")).toBeTruthy();
+    expect(screen.getByText("Transaksi hari ini")).toBeTruthy();
+    expect(screen.getByText("7")).toBeTruthy();
+    expect(screen.getByText("Produk stok menipis")).toBeTruthy();
+    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Produk terlaris (30 hari)" })).toBeTruthy();
+    expect(screen.getByText("✦ Beras Ramos — 12")).toBeTruthy();
+    expect(screen.getByText("✦ Gula Pasir — 5")).toBeTruthy();
+    expect(grosirApi).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("renders the same sales dashboard for cashier tenants", async () => {
+    vi.mocked(fetchTenantContext).mockResolvedValue({
+      userId: "cashier-1",
+      tenantId: "tenant-2",
+      role: "cashier",
+      sector: "grosir",
+    });
+    vi.mocked(grosirApi).mockResolvedValue({
+      todaySalesTotal: 25000,
+      todayTxnCount: 2,
+      lowStockCount: 0,
+      topProducts: [],
+    });
+
+    renderWithQuery(<TenantDashboard />);
+
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeTruthy();
+    expect(screen.getByText("Rp 25.000")).toBeTruthy();
+    expect(screen.getByText("Cashier dapat melihat ringkasan penjualan tanpa akses laporan lanjutan.")).toBeTruthy();
+  });
+
+  it("shows loading and error states while fetching the grosir dashboard", async () => {
+    vi.mocked(fetchTenantContext).mockResolvedValue({
+      userId: "user-2",
+      tenantId: "tenant-2",
+      role: "manager",
+      sector: "grosir",
+    });
+    vi.mocked(grosirApi).mockRejectedValue(new Error("network down"));
+
+    renderWithQuery(<TenantDashboard />);
+
+    expect(await screen.findByText("Loading…")).toBeTruthy();
+    expect(await screen.findByText("Dashboard belum bisa dimuat.")).toBeTruthy();
   });
 });
