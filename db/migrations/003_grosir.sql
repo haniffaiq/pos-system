@@ -157,7 +157,7 @@ create table stock_movements (
 create table notifications (
   id uuid primary key default uuid_v7(),
   tenant_id uuid not null references tenants(id) on delete cascade,
-  type text not null check (type in ('low_stock')),
+  type text not null check (type in ('low_stock','export_ready')),
   title text not null,
   body text,
   metadata jsonb not null default '{}',
@@ -169,7 +169,7 @@ create table notifications (
 create table export_jobs (
   id uuid primary key default uuid_v7(),
   tenant_id uuid not null references tenants(id) on delete cascade,
-  type text not null check (type in ('products','stock_movements','sales')),
+  type text not null check (type in ('sales','stock')),
   status text not null default 'pending' check (status in ('pending','processing','done','failed')),
   file_path text,
   params jsonb not null default '{}',

@@ -3,7 +3,7 @@ import { AppError } from "../../lib/errors";
 
 export interface NotificationRow {
   id: string;
-  type: "low_stock";
+  type: "low_stock" | "export_ready";
   title: string;
   body: string | null;
   metadata: Record<string, unknown>;
@@ -12,7 +12,7 @@ export interface NotificationRow {
 }
 
 export interface CreateNotificationInput {
-  type: "low_stock";
+  type: "low_stock" | "export_ready";
   title: string;
   body?: string | null;
   metadata?: Record<string, unknown>;
