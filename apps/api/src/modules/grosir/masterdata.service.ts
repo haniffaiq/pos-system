@@ -29,7 +29,11 @@ function requireRow<T>(row: T | undefined, kind: MasterDataKind): T {
 }
 
 export function listCategories(tenantId: string): Promise<NamedRow[]> {
-  return withTenant(tenantId, async (q) => (await q<NamedRow>("select id, name from categories order by name")).rows);
+  return withTenant(
+    tenantId,
+    async (q) =>
+      (await q<NamedRow>("select id, name from categories where tenant_id = current_setting('app.current_tenant_id')::uuid order by name")).rows,
+  );
 }
 
 export function createCategory(tenantId: string, input: CategoryInput): Promise<NamedRow> {
@@ -57,7 +61,11 @@ export function deleteCategory(tenantId: string, id: string): Promise<void> {
 }
 
 export function listUnits(tenantId: string): Promise<NamedRow[]> {
-  return withTenant(tenantId, async (q) => (await q<NamedRow>("select id, name from units order by name")).rows);
+  return withTenant(
+    tenantId,
+    async (q) =>
+      (await q<NamedRow>("select id, name from units where tenant_id = current_setting('app.current_tenant_id')::uuid order by name")).rows,
+  );
 }
 
 export function createUnit(tenantId: string, input: UnitInput): Promise<NamedRow> {
@@ -87,7 +95,12 @@ export function deleteUnit(tenantId: string, id: string): Promise<void> {
 export function listSuppliers(tenantId: string): Promise<SupplierRow[]> {
   return withTenant(
     tenantId,
-    async (q) => (await q<SupplierRow>("select id, name, phone, address from suppliers order by name")).rows,
+    async (q) =>
+      (
+        await q<SupplierRow>(
+          "select id, name, phone, address from suppliers where tenant_id = current_setting('app.current_tenant_id')::uuid order by name",
+        )
+      ).rows,
   );
 }
 
