@@ -4,7 +4,7 @@ import type { Hono } from "hono";
 /** A sector module exposes a Hono router mounted under /api/v1/t/:tenantId/m. */
 export interface SectorModule {
   sector: Sector;
-  router: Hono;
+  router: Hono<any>;
 }
 
 const registry = new Map<Sector, SectorModule>();

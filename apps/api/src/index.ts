@@ -5,6 +5,7 @@ import { onError } from "./middleware/error.js";
 import { adminRoutes } from "./routes/admin.routes";
 import { authRoutes } from "./routes/auth.routes";
 import { tenantRoutes } from "./routes/tenant.routes";
+import "./modules/grosir";
 
 const app = new Hono();
 
