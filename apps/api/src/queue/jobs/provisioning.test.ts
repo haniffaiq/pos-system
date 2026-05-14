@@ -19,23 +19,25 @@ vi.mock("../queues", async (importOriginal) => {
   };
 });
 
-const describeWithDatabase = process.env.DATABASE_ADMIN_URL ? describe : describe.skip;
+const databaseUrl = process.env.DATABASE_URL;
+const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
+const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
 
 describeWithDatabase("provisioning processor", () => {
   afterAll(async () => {
     await Promise.all([adminPool.end(), tenantPool.end()]);
   });
 
-  it("seeds default categories and units for a grosir tenant and queues a welcome email", async () => {
-    const slug = `prov-${Date.now()}`;
+  it("idempotently seeds default categories, units, settings, and welcome email for a grosir tenant", async () => {
+    const suffix = crypto.randomUUID().slice(0, 8);
     const tenant = await adminPool.query<{ id: string }>(
       "insert into tenants(name, slug, sector) values ($1, $2, 'grosir') returning id",
-      ["ProvCo", slug],
+      ["ProvCo", `prov-${suffix}`],
     );
-    const tenantId = tenant.rows[0].id;
+    const tenantId = tenant.rows[0]!.id;
     await adminPool.query(
-      "insert into users(tenant_id, email, password_hash, name, role) values ($1, 'owner@provco.test', 'hash', 'Owner', 'owner')",
-      [tenantId],
+      "insert into users(tenant_id, email, password_hash, name, role) values ($1, $2, 'hash', 'Owner', 'owner')",
+      [tenantId, `owner-${suffix}@provco.test`],
     );
 
     await provisioningProcessor({ data: { tenantId } } as Job<ProvisioningJob>);
@@ -61,12 +63,16 @@ describeWithDatabase("provisioning processor", () => {
       "Snack",
     ]);
     expect(units.rows.map((row) => row.name)).toEqual(["dus", "karton", "kg", "lusin", "pak", "pcs", "sak"]);
-    expect(settings.rows[0].settings.provisioned).toBe(true);
+    expect(settings.rows[0]!.settings.provisioned).toBe(true);
     expect(emailQueueAdd).toHaveBeenCalledTimes(2);
-    expect(emailQueueAdd).toHaveBeenLastCalledWith("welcome", {
-      to: "owner@provco.test",
-      template: "welcome",
-      vars: { name: "Owner" },
-    });
+    expect(emailQueueAdd).toHaveBeenLastCalledWith(
+      "send",
+      {
+        to: `owner-${suffix}@provco.test`,
+        template: "welcome",
+        vars: { name: "Owner" },
+      },
+      { jobId: `tenant-welcome-${tenantId}` },
+    );
   });
 });
