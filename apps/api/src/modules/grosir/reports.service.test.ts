@@ -1,10 +1,14 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
+import type { AppError } from "../../lib/errors";
 import { adminPool, tenantPool } from "../../db/pool";
 import { withAdmin } from "../../db/withTenant";
 import { createSale } from "./sales.service";
 import { recordMovement } from "./stock";
-import { requestExport, salesReport, stockReport } from "./reports.service";
+import { getExportDownload, requestExport, salesReport, stockReport } from "./reports.service";
 
 const databaseUrl = process.env.DATABASE_URL;
 const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
@@ -98,6 +102,29 @@ describeWithDatabase("reports service", () => {
     });
     expect(stored.params).toEqual({ from: "2000-01-01", to: "2999-01-01" });
     expect(stored.created_by).toBe(fixture.userId);
+  });
+
+  it("rejects done export downloads whose file path resolves outside the tenant export directory", async () => {
+    const fixture = await createReportsFixture("ReportsTraversal");
+    const exportRoot = mkdtempSync(join(tmpdir(), "exports-root-"));
+    const outsidePath = join(mkdtempSync(join(tmpdir(), "exports-outside-")), "hosts.csv");
+    writeFileSync(outsidePath, "not,a,tenant,export\n", "utf8");
+    process.env.EXPORT_DIR = exportRoot;
+
+    const job = await withAdmin(async (q) => {
+      const row = await q<{ id: string }>(
+        `insert into export_jobs(tenant_id, type, status, file_path, params, created_by)
+         values ($1, 'sales', 'done', $2, '{}'::jsonb, $3)
+         returning id`,
+        [fixture.tenantId, outsidePath, fixture.userId],
+      );
+      return row.rows[0]!;
+    });
+
+    await expect(getExportDownload(fixture.tenantId, job.id)).rejects.toMatchObject({
+      status: 409,
+      code: "unsafe_export_path",
+    } satisfies Partial<AppError>);
   });
 });
 

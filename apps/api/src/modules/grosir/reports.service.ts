@@ -1,3 +1,6 @@
+import { realpath } from "node:fs/promises";
+import { isAbsolute, relative, resolve } from "node:path";
+
 import { exportGenerationQueue } from "../../queue/queues";
 import { withTenant } from "../../db/withTenant";
 import { AppError } from "../../lib/errors";
@@ -70,6 +73,30 @@ function normalizeExport(row: ExportJobDbRow | undefined): ExportJobRow {
   return row as ExportJobRow;
 }
 
+async function resolveTenantExportPath(tenantId: string, filePath: string): Promise<string> {
+  const tenantExportDir = resolve(process.env.EXPORT_DIR ?? "/data/exports", tenantId);
+  const resolvedFilePath = resolve(filePath);
+  const relativeToTenantDir = relative(tenantExportDir, resolvedFilePath);
+
+  if (relativeToTenantDir.startsWith("..") || isAbsolute(relativeToTenantDir)) {
+    throw new AppError(409, "unsafe_export_path", "Export file path is outside the tenant export directory");
+  }
+
+  try {
+    const canonicalFilePath = await realpath(resolvedFilePath);
+    const canonicalRelativeToTenantDir = relative(tenantExportDir, canonicalFilePath);
+    if (canonicalRelativeToTenantDir.startsWith("..") || isAbsolute(canonicalRelativeToTenantDir)) {
+      throw new AppError(409, "unsafe_export_path", "Export file path is outside the tenant export directory");
+    }
+    return canonicalFilePath;
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw new AppError(404, "export_file_missing", "Export file is missing");
+  }
+}
+
 export function salesReport(tenantId: string, range: ReportRange): Promise<{ rows: SalesReportRow[]; grandTotal: number }> {
   return withTenant(tenantId, async (q) => {
     const result = await q<SalesReportDbRow>(
@@ -140,6 +167,7 @@ export function getExportDownload(tenantId: string, id: string): Promise<ExportD
     if (row.status !== "done" || !row.file_path) {
       throw new AppError(409, "export_not_ready", "Export job is not ready for download");
     }
-    return { filePath: row.file_path, filename: `${row.type}-${id}.csv` };
+    const safeFilePath = await resolveTenantExportPath(tenantId, row.file_path);
+    return { filePath: safeFilePath, filename: `${row.type}-${id}.csv` };
   });
 }
