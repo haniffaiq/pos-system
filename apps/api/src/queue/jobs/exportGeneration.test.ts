@@ -55,4 +55,38 @@ describeWithDatabase("export generation processor", () => {
     expect(existsSync(stored.rows[0]!.file_path)).toBe(true);
     expect(readFileSync(stored.rows[0]!.file_path, "utf8")).toContain("invoice_no");
   });
+
+  it("is idempotent when BullMQ retries a completed export job", async () => {
+    process.env.EXPORT_DIR = mkdtempSync(join(tmpdir(), "exports-"));
+    const fixture = await createExportFixture();
+    const exportJob = await requestExport(fixture.tenantId, fixture.userId, "sales", { from: "2000-01-01", to: "2999-01-01" });
+    const processorJob = { data: { exportJobId: exportJob.id, tenantId: fixture.tenantId } } as Job<ExportGenerationJob>;
+
+    await exportProcessor(processorJob);
+    const first = await adminPool.query<{ status: string; file_path: string }>("select status, file_path from export_jobs where id = $1", [
+      exportJob.id,
+    ]);
+    const firstPath = first.rows[0]!.file_path;
+    const firstCsv = readFileSync(firstPath, "utf8");
+
+    await exportProcessor(processorJob);
+
+    const stored = await adminPool.query<{
+      status: string;
+      file_path: string;
+      notifications: string;
+    }>(
+      `select e.status, e.file_path, count(n.id) as notifications
+         from export_jobs e
+         left join notifications n
+           on n.tenant_id = e.tenant_id
+          and n.type = 'export_ready'
+          and n.metadata->>'export_job_id' = e.id::text
+        where e.id = $1
+        group by e.status, e.file_path`,
+      [exportJob.id],
+    );
+    expect(stored.rows[0]).toMatchObject({ status: "done", file_path: firstPath, notifications: "1" });
+    expect(readFileSync(stored.rows[0]!.file_path, "utf8")).toBe(firstCsv);
+  });
 });
