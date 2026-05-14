@@ -53,6 +53,7 @@ describe("AdminLayout", () => {
     expect(container.textContent).toContain("Tenant list body");
     expect(container.querySelector('a[href="/admin"]')?.textContent).toContain("Dashboard");
     expect(container.querySelector('a[href="/admin/tenants"]')?.textContent).toContain("Tenants");
+    expect(container.querySelector('a[href="/admin/audit-log"]')?.textContent).toContain("Audit log");
     expect(container.querySelector("aside")?.className).toContain("border-r-2");
     expect(replace).not.toHaveBeenCalled();
   });

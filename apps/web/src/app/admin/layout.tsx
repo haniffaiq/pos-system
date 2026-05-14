@@ -34,6 +34,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <Link href="/admin/tenants" className="block rounded-md border-2 border-fg bg-primary px-3 py-2 font-display font-bold shadow-brutal-sm">
             Tenants
           </Link>
+          <Link href="/admin/audit-log" className="block rounded-md border-2 border-transparent px-3 py-2 font-display font-bold hover:border-fg hover:bg-primary/20">
+            Audit log
+          </Link>
         </aside>
         <main className="flex-1 p-6">{children}</main>
       </div>
