@@ -104,7 +104,7 @@ create table sales (
   total bigint not null check (total >= 0),
   paid bigint not null check (paid >= 0),
   change bigint not null check (change >= 0),
-  payment_method text not null default 'cash' check (payment_method in ('cash')),
+  payment_method text not null default 'cash' check (payment_method in ('cash','transfer','qris')),
   created_by uuid not null,
   created_at timestamptz not null default now(),
   unique (tenant_id, id),
