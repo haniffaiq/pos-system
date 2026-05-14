@@ -64,7 +64,10 @@ describe("003 grosir migration", () => {
     expect(migration).toContain("check (sell_price_eceran >= 0)");
     expect(migration).toContain("check (sell_price_grosir >= 0)");
     expect(migration).toContain("check (status in ('pending','processing','done','failed'))");
+    expect(migration).toContain("metadata jsonb not null default '{}'");
     expect(migration).toContain("create index notifications_tenant_unread_idx on notifications (tenant_id, is_read, created_at)");
+    expect(migration).toContain("create unique index notifications_unread_low_stock_product_idx");
+    expect(migration).toContain("where type = 'low_stock' and is_read = false and metadata ? 'product_id'");
     expect(migration).toContain("create index export_jobs_tenant_status_idx on export_jobs (tenant_id, status, created_at)");
   });
 });

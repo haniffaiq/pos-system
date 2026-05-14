@@ -2,6 +2,7 @@ import { Worker, type Job, type Processor, type WorkerOptions } from "bullmq";
 
 import { redis } from "./lib/redis";
 import { emailProcessor } from "./queue/jobs/email";
+import { lowStockProcessor } from "./queue/jobs/lowStockScan";
 import { provisioningProcessor } from "./queue/jobs/provisioning";
 import {
   type EmailJob,
@@ -17,10 +18,6 @@ export const WORKER_QUEUE_NAMES = QUEUE_NAMES;
 const workerOptions: WorkerOptions = {
   connection: redis,
   prefix: process.env.BULLMQ_QUEUE_PREFIX,
-};
-
-const lowStockScanProcessor: Processor<LowStockScanJob> = async () => {
-  // Phase 2 wires low-stock notification generation.
 };
 
 const exportGenerationProcessor: Processor<ExportGenerationJob> = async () => {
@@ -47,7 +44,7 @@ export function createWorkers(): Worker[] {
   return [
     createWorker<ProvisioningJob>("provisioning", provisioningProcessor),
     createWorker<EmailJob>("email", emailProcessor),
-    createWorker<LowStockScanJob>("low-stock-scan", lowStockScanProcessor),
+    createWorker<LowStockScanJob>("low-stock-scan", lowStockProcessor),
     createWorker<ExportGenerationJob>("export-generation", exportGenerationProcessor),
   ];
 }
