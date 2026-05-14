@@ -3,6 +3,7 @@ import { Hono } from "hono";
 
 import { authMiddleware } from "../../middleware/auth";
 import { adjustmentsRoutes } from "./adjustments.routes";
+import { dashboardRoutes } from "./dashboard.routes";
 import { masterdataRoutes } from "./masterdata.routes";
 import { notificationsRoutes } from "./notifications.routes";
 import { productsRoutes } from "./products.routes";
@@ -26,8 +27,8 @@ grosirRouter.route("/products", productsRoutes);
 grosirRouter.route("/stock-in", stockInRoutes);
 grosirRouter.route("/sales", salesRoutes);
 grosirRouter.route("/adjustments", adjustmentsRoutes);
+grosirRouter.route("/dashboard", dashboardRoutes);
 
 // Sub-routers are mounted here in later tasks:
-// grosirRouter.route("/dashboard", dashboardRoutes);
 // grosirRouter.route("/reports", reportsRoutes);
 grosirRouter.route("/notifications", notificationsRoutes);
