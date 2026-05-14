@@ -3,6 +3,7 @@ import { Hono } from "hono";
 
 import { authMiddleware } from "../../middleware/auth";
 import { masterdataRoutes } from "./masterdata.routes";
+import { notificationsRoutes } from "./notifications.routes";
 
 /**
  * Base router for the grosir module. The tenant router already ran auth,
@@ -25,4 +26,4 @@ grosirRouter.route("/masterdata", masterdataRoutes);
 // grosirRouter.route("/adjustments", adjustmentsRoutes);
 // grosirRouter.route("/dashboard", dashboardRoutes);
 // grosirRouter.route("/reports", reportsRoutes);
-// grosirRouter.route("/notifications", notificationsRoutes);
+grosirRouter.route("/notifications", notificationsRoutes);
