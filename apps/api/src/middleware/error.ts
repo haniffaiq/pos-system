@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError } from "zod";
 
-import { AppError } from "../lib/errors";
+import { AppError } from "../lib/errors.js";
 
 export function onError(err: Error, c: Context): Response {
   if (err instanceof AppError) {
