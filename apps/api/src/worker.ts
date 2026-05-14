@@ -1,6 +1,7 @@
 import { Worker, type Job, type Processor, type WorkerOptions } from "bullmq";
 
 import { redis } from "./lib/redis";
+import { emailProcessor } from "./queue/jobs/email";
 import {
   type EmailJob,
   type ExportGenerationJob,
@@ -19,10 +20,6 @@ const workerOptions: WorkerOptions = {
 
 const provisioningProcessor: Processor<ProvisioningJob> = async () => {
   // Task 18 wires tenant provisioning behavior.
-};
-
-const emailProcessor: Processor<EmailJob> = async () => {
-  // Task 19 wires outbound email behavior.
 };
 
 const lowStockScanProcessor: Processor<LowStockScanJob> = async () => {
