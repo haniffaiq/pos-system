@@ -1,9 +1,23 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { adminPool, tenantPool } from "../db/pool";
 import { withAdmin } from "../db/withTenant";
 import { AppError } from "../lib/errors";
 import { verifyPassword } from "../lib/password";
 import { createTenant, getTenant, listTenants, setTenantStatus } from "./tenant.service";
+
+const { provisioningQueueAdd } = vi.hoisted(() => ({
+  provisioningQueueAdd: vi.fn(),
+}));
+
+vi.mock("../queue/queues", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../queue/queues")>();
+  return {
+    ...actual,
+    provisioningQueue: {
+      add: provisioningQueueAdd,
+    },
+  };
+});
 
 const databaseUrl = process.env.DATABASE_URL;
 const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
@@ -11,6 +25,10 @@ const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
 const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
 
 describeWithDatabase("tenant.service", () => {
+  beforeEach(() => {
+    provisioningQueueAdd.mockClear();
+  });
+
   afterAll(async () => {
     await Promise.all([tenantPool.end(), adminPool.end()]);
   });
@@ -62,6 +80,7 @@ describeWithDatabase("tenant.service", () => {
     expect(stored.owner.password_hash).not.toBe("secret123");
     await expect(verifyPassword(stored.owner.password_hash, "secret123")).resolves.toBe(true);
     expect(stored.audit).toEqual([{ action: "tenant.create", target: tenant.id }]);
+    expect(provisioningQueueAdd).toHaveBeenCalledWith("provision", { tenantId: tenant.id });
   });
 
   it("rejects a duplicate slug with 409", async () => {
