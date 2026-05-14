@@ -2,6 +2,7 @@ import type { JwtPayload, Sector } from "@app/shared";
 import { Hono } from "hono";
 
 import { authMiddleware } from "../../middleware/auth";
+import { masterdataRoutes } from "./masterdata.routes";
 
 /**
  * Base router for the grosir module. The tenant router already ran auth,
@@ -15,8 +16,9 @@ export const grosirRouter = new Hono<{
 
 grosirRouter.use("*", authMiddleware);
 
+grosirRouter.route("/masterdata", masterdataRoutes);
+
 // Sub-routers are mounted here in later tasks:
-// grosirRouter.route("/masterdata", masterdataRoutes);
 // grosirRouter.route("/products", productsRoutes);
 // grosirRouter.route("/stock-in", stockInRoutes);
 // grosirRouter.route("/sales", salesRoutes);
