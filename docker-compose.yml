@@ -84,9 +84,11 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
       - "${WEB_PORT}:3000"
-    depends_on:
-      api:
-        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "apps/web/healthcheck.mjs"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   mailhog:
     image: mailhog/mailhog
