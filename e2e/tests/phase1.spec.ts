@@ -36,5 +36,6 @@ test("tenant owner logs in and reaches the owner dashboard", async ({ page }) =>
   await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(page).toHaveURL(new RegExp(`/t/${slug}$`));
-  await expect(page.getByText("Grosir module loads here (Phase 2).")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByText("Penjualan hari ini")).toBeVisible();
 });
