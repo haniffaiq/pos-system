@@ -3,7 +3,7 @@ import { adminPool, tenantPool } from "../db/pool";
 import { withAdmin } from "../db/withTenant";
 import { AppError } from "../lib/errors";
 import { verifyPassword } from "../lib/password";
-import { createTenant, getTenant, listTenants, setTenantStatus } from "./tenant.service";
+import { createTenant, getTenant, listAuditLog, listTenants, setTenantStatus } from "./tenant.service";
 
 const { provisioningQueueAdd } = vi.hoisted(() => ({
   provisioningQueueAdd: vi.fn(),
@@ -150,6 +150,43 @@ describeWithDatabase("tenant.service", () => {
     await expect(setTenantStatus(missingTenantId, "active", adminId)).rejects.toMatchObject<AppError>({
       status: 404,
       code: "not_found",
+    });
+  });
+
+  it("lists platform audit log entries newest first", async () => {
+    const adminId = await createPlatformAdmin();
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const firstTenant = await createTenant(
+      {
+        name: "Audit First",
+        slug: `audit-first-${suffix}`,
+        sector: "grosir",
+        ownerEmail: `audit-first-${suffix}@example.test`,
+        ownerPassword: "secret123",
+      },
+      adminId,
+    );
+    const secondTenant = await createTenant(
+      {
+        name: "Audit Second",
+        slug: `audit-second-${suffix}`,
+        sector: "retail",
+        ownerEmail: `audit-second-${suffix}@example.test`,
+        ownerPassword: "secret123",
+      },
+      adminId,
+    );
+
+    const entries = await listAuditLog();
+
+    expect(entries[0]).toMatchObject({
+      action: "tenant.create",
+      target: secondTenant.id,
+      admin_id: adminId,
+    });
+    expect(entries.find((entry) => entry.target === firstTenant.id)).toMatchObject({
+      action: "tenant.create",
+      admin_id: adminId,
     });
   });
 });
