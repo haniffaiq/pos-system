@@ -31,6 +31,15 @@ export interface TenantListFilter {
   search?: string;
 }
 
+export interface AuditEntry {
+  id: string;
+  admin_id: string | null;
+  action: string;
+  target: string | null;
+  meta: Record<string, unknown>;
+  created_at: Date;
+}
+
 async function audit(q: Query, adminId: string, action: string, target: string): Promise<void> {
   await q("insert into platform_audit_log(admin_id, action, target) values ($1, $2, $3)", [
     adminId,
@@ -109,6 +118,18 @@ export async function listTenants(filter: TenantListFilter = {}): Promise<Tenant
        from tenants${where.length ? ` where ${where.join(" and ")}` : ""}
        order by created_at desc`,
       params,
+    );
+    return rows;
+  });
+}
+
+export async function listAuditLog(): Promise<AuditEntry[]> {
+  return withAdmin(async (q) => {
+    const { rows } = await q<AuditEntry>(
+      `select id, admin_id, action, target, meta, created_at
+       from platform_audit_log
+       order by created_at desc, id desc
+       limit 200`,
     );
     return rows;
   });

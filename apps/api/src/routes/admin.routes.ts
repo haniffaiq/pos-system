@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { authMiddleware } from "../middleware/auth";
 import { requireRole } from "../middleware/requireRole";
-import { createTenant, getTenant, listTenants, setTenantStatus } from "../services/tenant.service";
+import { createTenant, getTenant, listAuditLog, listTenants, setTenantStatus } from "../services/tenant.service";
 
 const tenantListFilterSchema = z.object({
   status: z.enum(["active", "suspended"]).optional(),
@@ -23,6 +23,8 @@ adminRoutes.get("/tenants", async (c) => {
   });
   return c.json(await listTenants(filter));
 });
+
+adminRoutes.get("/audit-log", async (c) => c.json(await listAuditLog()));
 
 adminRoutes.post("/tenants", async (c) => {
   const input = registerTenantSchema.parse(await c.req.json());

@@ -4,18 +4,20 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { app as mountedApp } from "../index";
 import { signAccess } from "../lib/jwt";
 import { onError } from "../middleware/error";
-import { createTenant, getTenant, listTenants, setTenantStatus } from "../services/tenant.service";
+import { createTenant, getTenant, listAuditLog, listTenants, setTenantStatus } from "../services/tenant.service";
 import { adminRoutes } from "./admin.routes";
 
 vi.mock("../services/tenant.service", () => ({
   createTenant: vi.fn(),
   listTenants: vi.fn(),
+  listAuditLog: vi.fn(),
   getTenant: vi.fn(),
   setTenantStatus: vi.fn(),
 }));
 
 const createTenantMock = vi.mocked(createTenant);
 const listTenantsMock = vi.mocked(listTenants);
+const listAuditLogMock = vi.mocked(listAuditLog);
 const getTenantMock = vi.mocked(getTenant);
 const setTenantStatusMock = vi.mocked(setTenantStatus);
 
@@ -99,6 +101,48 @@ describe("admin routes", () => {
 
     expect(response.status).toBe(400);
     expect(listTenantsMock).not.toHaveBeenCalled();
+  });
+
+  it("lists platform audit log entries for a platform admin", async () => {
+    const token = await platformAdminToken();
+    listAuditLogMock.mockResolvedValueOnce([
+      {
+        id: "audit-1",
+        admin_id: "admin-1",
+        action: "tenant.create",
+        target: "tenant-1",
+        meta: { source: "test" },
+        created_at: new Date("2026-05-14T00:00:00.000Z"),
+      },
+    ]);
+
+    const response = await testApp().request("/api/v1/admin/audit-log", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([
+      {
+        id: "audit-1",
+        admin_id: "admin-1",
+        action: "tenant.create",
+        target: "tenant-1",
+        meta: { source: "test" },
+        created_at: "2026-05-14T00:00:00.000Z",
+      },
+    ]);
+    expect(listAuditLogMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a tenant-role token from audit log with 403", async () => {
+    const token = await signAccess({ sub: "user-1", tenantId: "tenant-1", role: "owner" });
+
+    const response = await testApp().request("/api/v1/admin/audit-log", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(403);
+    expect(listAuditLogMock).not.toHaveBeenCalled();
   });
 
   it("creates a tenant for a platform admin", async () => {
