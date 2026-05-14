@@ -1,0 +1,6 @@
+-- dev-only: one platform admin (password: "admin123").
+-- Seed execution is owned by the auth/register flow in a later task; this file
+-- documents the local quick-start identity without committing a placeholder hash.
+-- Local quick start once password hashing is wired into seeding:
+--   insert into platform_admins(email, password_hash, name)
+--   values ('admin@local', generated_argon2_hash, 'Local Admin');
