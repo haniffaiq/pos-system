@@ -1,12 +1,15 @@
 import "./globals.css";
 import type { ReactNode } from "react";
+import { Providers } from "../lib/providers";
 
 export const metadata = { title: "Operational Web App" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
