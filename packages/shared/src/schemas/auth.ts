@@ -2,8 +2,12 @@ import { z } from "zod";
 
 const sectorValues = ["grosir", "retail", "fnb", "jasa", "apotek"] as const;
 
+const loginIdentifierSchema = z
+  .string()
+  .regex(/^[^\s@]+@[^\s@]+$/, "Invalid email");
+
 export const loginSchema = z.object({
-  email: z.string().email(),
+  email: loginIdentifierSchema,
   password: z.string().min(8),
 });
 

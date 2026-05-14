@@ -1,0 +1,11 @@
+{
+  "name": "@app/e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:phase1": "playwright test tests/phase1.spec.ts --project=chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

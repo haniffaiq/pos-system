@@ -14,6 +14,10 @@ describe("auth schemas", () => {
     expect(loginSchema.parse({ email: "a@b.com", password: "secret12" })).toBeTruthy();
   });
 
+  it("accepts the seeded local admin login identifier", () => {
+    expect(loginSchema.parse({ email: "admin@local", password: "admin123" })).toBeTruthy();
+  });
+
   it("rejects a short login password", () => {
     expect(() => loginSchema.parse({ email: "a@b.com", password: "x" })).toThrow();
   });

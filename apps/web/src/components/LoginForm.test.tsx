@@ -1,4 +1,5 @@
 import React from "react";
+import { renderToString } from "react-dom/server";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiFetch } from "@/lib/api";
@@ -53,6 +54,15 @@ describe("LoginForm", () => {
     expect(await screen.findByText("Invalid email")).toBeTruthy();
     expect(await screen.findByText("String must contain at least 8 character(s)")).toBeTruthy();
     expect(mockedApiFetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the server-rendered submit button disabled until the client has hydrated", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const markup = renderToString(<LoginForm mode="admin" />);
+
+    expect(markup).toContain("disabled=\"\"");
+    consoleError.mockRestore();
   });
 
   it("persists platform admin tokens and routes to admin shell", async () => {

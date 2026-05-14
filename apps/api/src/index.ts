@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 
 import { onError } from "./middleware/error.js";
 import { adminRoutes } from "./routes/admin.routes";
@@ -9,6 +10,14 @@ import "./modules/grosir";
 
 const app = new Hono();
 
+app.use(
+  "/*",
+  cors({
+    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+    allowHeaders: ["content-type", "authorization"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  }),
+);
 app.onError(onError);
 app.get("/health", (c) => c.json({ ok: true }));
 
