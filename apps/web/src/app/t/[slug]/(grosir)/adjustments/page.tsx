@@ -92,7 +92,7 @@ export default function AdjustmentsPage() {
               if (productId && qtyBase !== 0) submit.mutate();
             }}
           >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4 md:items-end">
               <Select label="Produk" value={productId} onChange={(event) => setProductId(event.target.value)}>
                 <option value="">Pilih produk</option>
                 {products.map((product) => (

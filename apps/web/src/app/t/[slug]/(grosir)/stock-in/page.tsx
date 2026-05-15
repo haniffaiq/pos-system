@@ -130,7 +130,7 @@ export default function StockInPage() {
 
           <Card>
             <h2 className="mb-3 text-xl font-black">Tambah item</h2>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-5 sm:items-end">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 lg:items-end">
               <Select label="Produk" value={draft.productId} onChange={(event) => setDraft({ ...draft, productId: event.target.value, unitId: "" })}>
                 <option value="">— pilih produk —</option>
                 {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}

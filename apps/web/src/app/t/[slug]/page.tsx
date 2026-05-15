@@ -41,7 +41,7 @@ function GrosirDashboard({ role }: { role: string }) {
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3">
         <Card hover>
           <p className="font-bold text-fg/70">Penjualan hari ini</p>
           <p className="text-4xl font-black">{formatRupiah(data.todaySalesTotal)}</p>

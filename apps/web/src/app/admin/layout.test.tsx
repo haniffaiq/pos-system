@@ -10,6 +10,7 @@ const replace = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace }),
+  usePathname: () => "/admin",
 }));
 
 vi.mock("next/link", () => ({
@@ -67,8 +68,11 @@ describe("AdminLayout", () => {
       );
     });
 
+    const logoutButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
+      (btn) => btn.textContent?.includes("Log out"),
+    )!;
     await act(async () => {
-      container.querySelector<HTMLButtonElement>("button")!.click();
+      logoutButton.click();
     });
 
     expect(localStorage.getItem("owa.session")).toBeNull();

@@ -122,7 +122,7 @@ export default function ReportsPage() {
       </div>
 
       <Card>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 sm:items-end">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4 md:items-end">
           <Input label="Dari" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
           <Input label="Sampai" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
           <Button variant="secondary" onClick={() => requestExport.mutate("sales")} disabled={!canRead || requestExport.isPending}>
