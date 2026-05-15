@@ -1,0 +1,169 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    name: verify build, tests, and Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: operational
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d operational"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://app:app_password@localhost:5432/operational
+      DATABASE_ADMIN_URL: postgres://app_admin:admin_password@localhost:5432/operational
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci_access_secret_at_least_32_characters_long
+      JWT_REFRESH_SECRET: ci_refresh_secret_at_least_32_characters_long
+      ACCESS_TOKEN_TTL: "900"
+      REFRESH_TOKEN_TTL: "2592000"
+      INVITE_TOKEN_TTL_SECONDS: "604800"
+      PASSWORD_RESET_TOKEN_TTL_SECONDS: "3600"
+      SMTP_HOST: localhost
+      SMTP_PORT: "1025"
+      SMTP_SECURE: "false"
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
+      MAIL_FROM: operational-app-ci
+      API_PORT: "4000"
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+      EXPORT_DIR: /tmp/pos-exports
+      BULLMQ_QUEUE_PREFIX: ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install system clients
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Prepare database roles
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql "postgres://postgres:postgres@localhost:5432/operational" --set ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app') THEN
+              CREATE ROLE app LOGIN PASSWORD 'app_password' NOBYPASSRLS;
+            END IF;
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_admin') THEN
+              CREATE ROLE app_admin LOGIN PASSWORD 'admin_password' BYPASSRLS;
+            END IF;
+          END
+          $$;
+          ALTER ROLE app WITH LOGIN PASSWORD 'app_password' NOBYPASSRLS;
+          ALTER ROLE app_admin WITH LOGIN PASSWORD 'admin_password' BYPASSRLS;
+          ALTER DATABASE operational OWNER TO app_admin;
+          ALTER SCHEMA public OWNER TO app_admin;
+          GRANT CONNECT ON DATABASE operational TO app;
+          GRANT USAGE ON SCHEMA public TO app;
+          GRANT ALL PRIVILEGES ON DATABASE operational TO app_admin;
+          GRANT ALL PRIVILEGES ON SCHEMA public TO app_admin;
+          SQL
+
+      - name: Run database migrations
+        run: pnpm migrate
+
+      - name: Run unit and integration tests
+        run: pnpm test
+
+      - name: Build API and web
+        run: |
+          pnpm --filter @app/api build
+          pnpm --filter @app/web build
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @app/e2e exec playwright install --with-deps chromium
+
+      - name: Seed platform admins for e2e
+        run: |
+          pnpm seed:admin admin@local admin123
+          pnpm seed:admin admin@example.test admin123
+
+      - name: Start API, worker, and web
+        run: |
+          mkdir -p "$EXPORT_DIR"
+          pnpm --filter @app/api exec tsx src/index.ts > /tmp/pos-api.log 2>&1 &
+          pnpm --filter @app/api exec tsx src/worker.ts > /tmp/pos-worker.log 2>&1 &
+          mkdir -p apps/web/.next/standalone/apps/web/.next/static
+          cp -R apps/web/.next/static/. apps/web/.next/standalone/apps/web/.next/static/
+          PORT=3000 HOSTNAME=0.0.0.0 node apps/web/.next/standalone/apps/web/server.js > /tmp/pos-web.log 2>&1 &
+          for i in {1..60}; do
+            if curl -fsS http://localhost:4000/health >/dev/null && curl -fsS http://localhost:3000 >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'API log:'
+          cat /tmp/pos-api.log || true
+          echo 'Worker log:'
+          cat /tmp/pos-worker.log || true
+          echo 'Web log:'
+          cat /tmp/pos-web.log || true
+          exit 1
+
+      - name: Run Playwright Phase 1 gate
+        run: pnpm --filter @app/e2e test:phase1
+
+      - name: Seed grosir tenant
+        id: seed_grosir
+        run: |
+          slug=$(bash e2e/seed-grosir.sh)
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
+          echo "Seeded grosir tenant $slug"
+
+      - name: Run Playwright Phase 2 gate
+        env:
+          E2E_GROSIR_SLUG: ${{ steps.seed_grosir.outputs.slug }}
+        run: pnpm --filter @app/e2e test:phase2
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          if-no-files-found: ignore

@@ -165,7 +165,11 @@ describe("grosir reports page", () => {
     });
     const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Headers;
     expect(headers.get("authorization")).toBe("Bearer access-token");
-    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    const downloadedBlob = createObjectURL.mock.calls[0]?.[0] as Blob;
+    expect(downloadedBlob).toBeTruthy();
+    expect(downloadedBlob.size).toBe(32);
+    expect(downloadedBlob.type).toBe("text/plain;charset=utf-8");
     expect(click).toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalledWith(objectUrl);
   });
