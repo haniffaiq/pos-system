@@ -22,6 +22,7 @@ x-app-environment: &app-environment
   SMTP_PASSWORD: ${SMTP_PASSWORD}
   MAIL_FROM: ${MAIL_FROM}
   EXPORT_DIR: ${EXPORT_DIR}
+  CORS_ORIGINS: ${CORS_ORIGINS}
 
 services:
   db:
@@ -35,7 +36,7 @@ services:
       POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER}
       POSTGRES_ADMIN_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - ./db/data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
@@ -48,7 +49,7 @@ services:
   redis:
     image: docker.io/library/redis:7
     ports:
-      - "6379:6379"
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -57,7 +58,7 @@ services:
 
   api:
     build: *api-build
-    command: node dist/index.js
+    command: pnpm exec tsx src/index.ts
     environment: *app-environment
     ports:
       - "${API_PORT}:4000"
@@ -71,7 +72,7 @@ services:
 
   worker:
     build: *api-build
-    command: node dist/worker.js
+    command: pnpm exec tsx src/worker.ts
     environment: *app-environment
     volumes:
       - exports:${EXPORT_DIR}
@@ -88,6 +89,8 @@ services:
     environment:
       NODE_ENV: development
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
     ports:
       - "${WEB_PORT}:3000"
     healthcheck:

@@ -4,7 +4,7 @@ set -euo pipefail
 API_BASE_URL="${API_BASE_URL:-http://localhost:4000}"
 ADMIN_EMAIL="${E2E_ADMIN_EMAIL:-admin@example.test}"
 ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-admin123}"
-SLUG="${E2E_GROSIR_SLUG:-e2e-grosir-$(date +%s%N)}"
+SLUG="${E2E_GROSIR_SLUG:-e2e-grosir-$(date +%s)-${RANDOM:-0}}"
 
 login_response=$(curl -fsS "$API_BASE_URL/api/v1/auth/admin-login" \
   -H 'content-type: application/json' \
