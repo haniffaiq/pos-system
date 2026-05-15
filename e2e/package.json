@@ -4,7 +4,8 @@
   "scripts": {
     "test": "playwright test",
     "test:phase1": "playwright test tests/phase1.spec.ts --project=chromium",
-    "test:phase2": "playwright test tests/phase2-grosir.spec.ts --project=chromium"
+    "test:phase2": "playwright test tests/phase2-grosir.spec.ts --project=chromium",
+    "test:phase3": "playwright test tests/phase3-responsive.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0"

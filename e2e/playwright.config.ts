@@ -16,5 +16,13 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 1400 } },
     },
+    {
+      name: "tablet",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 768, height: 1024 }, isMobile: false, hasTouch: true },
+    },
+    {
+      name: "mobile",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 390, height: 844 }, isMobile: false, hasTouch: true, deviceScaleFactor: 2 },
+    },
   ],
 });
