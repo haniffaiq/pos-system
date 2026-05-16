@@ -3,7 +3,7 @@ const tones: Record<Tone, string> = { primary: "bg-primary", secondary: "bg-seco
 
 export function Toast({ tone = "primary", message }: { tone?: Tone; message: string }) {
   return (
-    <div className={`fixed bottom-4 right-4 z-50 border-2 border-fg rounded-md shadow-brutal px-4 py-2 font-display font-bold text-fg ${tones[tone]}`}>
+    <div role="status" aria-live="polite" className={`fixed bottom-4 right-4 z-50 border-2 border-fg rounded-md shadow-brutal px-4 py-2 font-display font-bold text-fg ${tones[tone]}`}>
       {message}
     </div>
   );

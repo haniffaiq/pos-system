@@ -8,6 +8,9 @@ export const Input = forwardRef<HTMLInputElement, Props>(function Input(
 ) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
+  const errorId = `${inputId}-error`;
+  const { "aria-describedby": ariaDescribedBy, ...inputProps } = rest;
+  const describedBy = [ariaDescribedBy, error ? errorId : undefined].filter(Boolean).join(" ") || undefined;
 
   return (
     <div className="block text-fg">
@@ -19,10 +22,12 @@ export const Input = forwardRef<HTMLInputElement, Props>(function Input(
       <input
         ref={ref}
         id={inputId}
-        {...rest}
+        {...inputProps}
+        aria-invalid={error ? true : inputProps["aria-invalid"]}
+        aria-describedby={describedBy}
         className={`w-full border-2 border-fg rounded-md bg-card px-3 py-2 text-fg shadow-brutal-sm focus:outline-none focus:-translate-y-[1px] ${className}`}
       />
-      {error && <span className="mt-1 block text-xs text-accent font-bold">{error}</span>}
+      {error && <span id={errorId} className="mt-1 block text-xs text-accent font-bold">{error}</span>}
     </div>
   );
 });
