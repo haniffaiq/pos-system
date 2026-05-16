@@ -15,6 +15,7 @@ describe("session storage helpers", () => {
     setSession({ accessToken: "access-1", refreshToken: "refresh-1", role: "admin", tenantId: null });
 
     expect(getSession()).toEqual({ role: "admin", tenantId: null });
+    expect(sessionStorage.getItem("owa.session")).toBe(JSON.stringify({ role: "admin", tenantId: null }));
     expect(localStorage.getItem("owa.session")).toBeNull();
 
     clearSession();
@@ -82,6 +83,7 @@ describe("apiFetch", () => {
   });
 
   it("uses HTTP-only cookie credentials and retries once after refreshing a 401", async () => {
+    document.cookie = "brs_csrf=csrf-1; path=/";
     setSession({ accessToken: "old-access", refreshToken: "refresh-1", role: "cashier", tenantId: "tenant-1" });
     const fetchMock = vi
       .fn()
@@ -90,17 +92,19 @@ describe("apiFetch", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const data = await apiFetch<{ ok: boolean }>("/sales");
+    const data = await apiFetch<{ ok: boolean }>("/sales", { method: "POST", body: JSON.stringify({ total: 1 }) });
 
     expect(data).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ credentials: "include" });
     expect((fetchMock.mock.calls[0][1].headers as Headers).get("authorization")).toBeNull();
+    expect((fetchMock.mock.calls[0][1].headers as Headers).get("x-csrf-token")).toBe("csrf-1");
     expect(fetchMock.mock.calls[1][0]).toBe("http://localhost:4000/api/v1/auth/refresh");
     expect(fetchMock.mock.calls[1][1]).toMatchObject({
       method: "POST",
       credentials: "include",
     });
+    expect((fetchMock.mock.calls[1][1].headers as Headers).get("x-csrf-token")).toBe("csrf-1");
     expect((fetchMock.mock.calls[2][1].headers as Headers).get("authorization")).toBeNull();
     expect(getSession()).toEqual({ role: "cashier", tenantId: "tenant-1" });
   });
