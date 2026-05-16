@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { withAdmin } from "../db/withTenant";
 import { AppError } from "../lib/errors";
 import { authMiddleware } from "../middleware/auth";
+import { onError } from "../middleware/error";
 import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { getModule } from "../modules/registry";
 
@@ -71,5 +72,9 @@ tenantRoutes.all("/:tenantId/m/*", async (c) => {
     ? (url.pathname.slice(modulePrefix.length) || "/")
     : url.pathname;
 
-  return mod.router.fetch(new Request(url, c.req.raw), c.env);
+  try {
+    return await mod.router.fetch(new Request(url, c.req.raw), c.env);
+  } catch (error) {
+    return onError(error as Error, c);
+  }
 });

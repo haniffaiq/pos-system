@@ -2,6 +2,7 @@ import type { JwtPayload, Sector } from "@app/shared";
 import { Hono } from "hono";
 
 import { authMiddleware } from "../../middleware/auth";
+import { onError } from "../../middleware/error";
 import { adjustmentsRoutes } from "./adjustments.routes";
 import { dashboardRoutes } from "./dashboard.routes";
 import { masterdataRoutes } from "./masterdata.routes";
@@ -21,6 +22,7 @@ export const grosirRouter = new Hono<{
   Variables: { auth: JwtPayload; sector: Sector };
 }>();
 
+grosirRouter.onError(onError);
 grosirRouter.use("*", authMiddleware);
 
 grosirRouter.route("/masterdata", masterdataRoutes);

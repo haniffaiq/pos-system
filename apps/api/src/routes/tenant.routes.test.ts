@@ -7,7 +7,9 @@ import { signAccess } from "../lib/jwt";
 import { onError } from "../middleware/error";
 import { tenantRoutes } from "./tenant.routes";
 
-const { loadPlanForTenantMock, withAdminMock } = vi.hoisted(() => ({
+const { countResourceMock, isOverQuotaMock, loadPlanForTenantMock, withAdminMock } = vi.hoisted(() => ({
+  countResourceMock: vi.fn(),
+  isOverQuotaMock: vi.fn(),
   loadPlanForTenantMock: vi.fn(),
   withAdminMock: vi.fn(),
 }));
@@ -17,6 +19,10 @@ vi.mock("../db/withTenant", () => ({
 }));
 
 vi.mock("../services/quota.service", () => ({
+  countResource: countResourceMock,
+  currentMonthlyUsage: vi.fn(),
+  incrementUsage: vi.fn(),
+  isOverQuota: isOverQuotaMock,
   loadPlanForTenant: loadPlanForTenantMock,
 }));
 
@@ -59,6 +65,8 @@ beforeAll(() => {
 beforeEach(() => {
   vi.clearAllMocks();
   loadPlanForTenantMock.mockResolvedValue({ status: "active", quota: {} });
+  countResourceMock.mockResolvedValue(0);
+  isOverQuotaMock.mockImplementation((limit: number, current: number) => current >= limit && limit >= 0);
   delete process.env.BILLING_ENABLED;
 });
 
@@ -190,6 +198,37 @@ describe("tenant routes", () => {
       error: {
         code: "module_coming_soon",
         message: "This sector module is not available yet",
+      },
+    });
+  });
+
+  it("serializes AppError responses thrown by the mounted grosir module", async () => {
+    const tenantId = "00000000-0000-4000-8000-000000000001";
+    const token = await tenantToken(tenantId);
+    mockTenantLookup(tenantRow("grosir"));
+    loadPlanForTenantMock.mockResolvedValueOnce({ status: "active", quota: { skus: 100 } });
+    countResourceMock.mockResolvedValueOnce(100);
+
+    const response = await testApp().request(`/api/v1/t/${tenantId}/m/products`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        sku: "OVER-QUOTA",
+        name: "Over quota",
+        baseUnitId: "00000000-0000-4000-8000-000000000010",
+        buyPrice: 1000,
+        sellPriceEceran: 1500,
+        sellPriceGrosir: 0,
+        minStock: 1,
+      }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "QUOTA_EXCEEDED",
+        message: "Quota exceeded",
+        details: { metric: "skus", limit: 100, current: 100, upgrade_url: `/t/${tenantId}/billing` },
       },
     });
   });
