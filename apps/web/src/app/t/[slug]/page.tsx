@@ -3,9 +3,15 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge, Card } from "@app/ui";
+import { apiFetch } from "@/lib/api";
 import { formatRupiah } from "@/lib/format";
 import { grosirApi } from "@/lib/grosir";
 import { fetchTenantContext } from "@/lib/tenant";
+
+interface BillingSummary {
+  plan: { quota?: Record<string, number | null | undefined> } | null;
+  usage?: Record<string, number | null | undefined>;
+}
 
 interface Dashboard {
   todaySalesTotal: number;
@@ -14,12 +20,66 @@ interface Dashboard {
   topProducts: { product_id: string; name: string; qty_sold: number }[];
 }
 
+const metricLabels: Record<string, string> = {
+  users: "Pengguna",
+  skus: "Produk (SKU)",
+  tx_per_month: "Transaksi / bulan",
+  tx_count: "Transaksi / bulan",
+  export_count: "Ekspor laporan",
+  exports: "Ekspor laporan",
+  outlets: "Outlet",
+};
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("id-ID").format(value);
+}
+
+function quotaRows(summary?: BillingSummary) {
+  const quota = summary?.plan?.quota ?? {};
+  const usage = summary?.usage ?? {};
+  return Object.entries(quota).flatMap(([metric, limit]) => {
+    if (typeof limit !== "number" || !Number.isFinite(limit)) return [];
+    const current = typeof usage[metric] === "number" && Number.isFinite(usage[metric]) ? usage[metric] : 0;
+    return [{ metric, label: metricLabels[metric] ?? metric, current, limit }];
+  });
+}
+
+function QuotaUsageBars({ summary }: { summary?: BillingSummary }) {
+  const rows = quotaRows(summary);
+  if (rows.length === 0) return null;
+
+  return (
+    <Card>
+      <h2 className="mb-3 text-xl font-black">Penggunaan kuota</h2>
+      <div className="space-y-4">
+        {rows.map((row) => {
+          const pct = row.limit > 0 ? Math.min(100, Math.round((row.current / row.limit) * 100)) : 0;
+          return (
+            <div key={row.metric} className="space-y-2">
+              <div className="flex items-center justify-between gap-3 text-sm font-black">
+                <span>{row.label}</span>
+                <span>
+                  {formatNumber(row.current)} / {formatNumber(row.limit)}
+                </span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full border-2 border-fg bg-bg" aria-label={`${row.label} ${pct}%`}>
+                <div className="h-full bg-fg" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 function GrosirDashboard({ role }: { role: string }) {
   const {
     data,
     isError,
     isLoading,
   } = useQuery({ queryKey: ["/dashboard"], queryFn: () => grosirApi<Dashboard>("/dashboard") });
+  const { data: billingSummary } = useQuery({ queryKey: ["/billing/summary"], queryFn: () => apiFetch<BillingSummary>("/billing/summary") });
 
   if (isLoading) return <p className="text-fg/70">Loading…</p>;
 
@@ -55,6 +115,8 @@ function GrosirDashboard({ role }: { role: string }) {
           <p className="text-4xl font-black">{data.lowStockCount}</p>
         </Card>
       </div>
+
+      <QuotaUsageBars summary={billingSummary} />
 
       <Card>
         <h2 className="mb-3 text-xl font-black">Produk terlaris (30 hari)</h2>

@@ -3,6 +3,7 @@ import React, { type ReactNode } from "react";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { Providers } from "../lib/providers";
+import { QuotaModal } from "../components/QuotaModal";
 
 export const metadata = {
   title: "BroSolution — Operational Grosir",
@@ -17,7 +18,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang={locale}>
       <body>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <Providers>{children}</Providers>
+          <Providers>
+            {children}
+            <QuotaModal />
+          </Providers>
         </NextIntlClientProvider>
       </body>
     </html>
