@@ -1,5 +1,6 @@
 import { loginSchema, type JwtPayload } from "@app/shared";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { z } from "zod";
 
 import { withAdmin } from "../db/withTenant";
@@ -23,6 +24,42 @@ const emailOtpSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
 const loginIpLimiter = rateLimitMiddleware(loginIpRateLimit, requestIpKey);
 const loginEmailLimiter = rateLimitByJsonBodyField(loginEmailRateLimit, "email");
 const refreshIpLimiter = rateLimitMiddleware(refreshIpRateLimit, requestIpKey);
+const isProduction = process.env.NODE_ENV === "production";
+
+function setAuthCookies(c: Context, tokens: { accessToken: string; refreshToken: string }) {
+  setCookie(c, "owa.access", tokens.accessToken, {
+    httpOnly: true,
+    sameSite: "Lax",
+    secure: isProduction,
+    path: "/",
+    maxAge: Number(process.env.ACCESS_TOKEN_TTL ?? 900),
+  });
+  setCookie(c, "owa.refresh", tokens.refreshToken, {
+    httpOnly: true,
+    sameSite: "Lax",
+    secure: isProduction,
+    path: "/api/v1/auth",
+    maxAge: Number(process.env.REFRESH_TOKEN_TTL ?? 60 * 60 * 24 * 30),
+  });
+}
+
+function clearAuthCookies(c: Context) {
+  deleteCookie(c, "owa.access", { path: "/" });
+  deleteCookie(c, "owa.refresh", { path: "/api/v1/auth" });
+}
+
+async function refreshTokenFromRequest(c: Context): Promise<string> {
+  const cookieToken = getCookie(c, "owa.refresh");
+  if (cookieToken) return cookieToken;
+
+  let body: unknown = {};
+  try {
+    body = await c.req.json();
+  } catch {
+    body = {};
+  }
+  return refreshSchema.parse(body).refreshToken;
+}
 
 export const authRoutes = new Hono<{ Variables: { auth: JwtPayload } }>();
 
@@ -48,22 +85,28 @@ async function emailForMfa(auth: JwtPayload): Promise<string> {
 
 authRoutes.post("/tenant-login", loginIpLimiter, loginEmailLimiter, async (c) => {
   const { slug, email, password } = tenantLoginSchema.parse(await c.req.json());
-  return c.json(await loginTenantUser(slug, email, password));
+  const result = await loginTenantUser(slug, email, password);
+  setAuthCookies(c, result);
+  return c.json(result);
 });
 
 authRoutes.post("/admin-login", loginIpLimiter, loginEmailLimiter, async (c) => {
   const { email, password } = loginSchema.parse(await c.req.json());
-  return c.json(await loginPlatformAdmin(email, password));
+  const result = await loginPlatformAdmin(email, password);
+  setAuthCookies(c, result);
+  return c.json(result);
 });
 
 authRoutes.post("/refresh", refreshIpLimiter, async (c) => {
-  const { refreshToken } = refreshSchema.parse(await c.req.json());
-  return c.json(await refresh(refreshToken));
+  const result = await refresh(await refreshTokenFromRequest(c));
+  setAuthCookies(c, result);
+  return c.json(result);
 });
 
 authRoutes.post("/logout", async (c) => {
-  const { refreshToken } = refreshSchema.parse(await c.req.json());
+  const refreshToken = await refreshTokenFromRequest(c);
   await logout(refreshToken);
+  clearAuthCookies(c);
   return c.json({ ok: true });
 });
 

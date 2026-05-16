@@ -4,6 +4,7 @@ import { fetchTenantContext } from "./tenant";
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });

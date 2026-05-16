@@ -4,6 +4,7 @@ import { ApiError, apiFetch } from "./api";
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -13,12 +14,8 @@ describe("session storage helpers", () => {
   it("stores, reads, and clears the browser session", () => {
     setSession({ accessToken: "access-1", refreshToken: "refresh-1", role: "admin", tenantId: null });
 
-    expect(getSession()).toEqual({
-      accessToken: "access-1",
-      refreshToken: "refresh-1",
-      role: "admin",
-      tenantId: null,
-    });
+    expect(getSession()).toEqual({ role: "admin", tenantId: null });
+    expect(localStorage.getItem("owa.session")).toBeNull();
 
     clearSession();
     expect(getSession()).toBeNull();
@@ -58,12 +55,12 @@ describe("apiFetch", () => {
     await expect(apiFetch("/missing")).rejects.toBeInstanceOf(ApiError);
   });
 
-  it("attaches the access token and retries once after refreshing a 401", async () => {
+  it("uses HTTP-only cookie credentials and retries once after refreshing a 401", async () => {
     setSession({ accessToken: "old-access", refreshToken: "refresh-1", role: "cashier", tenantId: "tenant-1" });
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: "unauthorized", message: "Expired" } }), { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ accessToken: "new-access", refreshToken: "refresh-2" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -71,19 +68,15 @@ describe("apiFetch", () => {
 
     expect(data).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect((fetchMock.mock.calls[0][1].headers as Headers).get("authorization")).toBe("Bearer old-access");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ credentials: "include" });
+    expect((fetchMock.mock.calls[0][1].headers as Headers).get("authorization")).toBeNull();
     expect(fetchMock.mock.calls[1][0]).toBe("http://localhost:4000/api/v1/auth/refresh");
     expect(fetchMock.mock.calls[1][1]).toMatchObject({
       method: "POST",
-      body: JSON.stringify({ refreshToken: "refresh-1" }),
+      credentials: "include",
     });
-    expect((fetchMock.mock.calls[2][1].headers as Headers).get("authorization")).toBe("Bearer new-access");
-    expect(getSession()).toEqual({
-      accessToken: "new-access",
-      refreshToken: "refresh-2",
-      role: "cashier",
-      tenantId: "tenant-1",
-    });
+    expect((fetchMock.mock.calls[2][1].headers as Headers).get("authorization")).toBeNull();
+    expect(getSession()).toEqual({ role: "cashier", tenantId: "tenant-1" });
   });
 
   it("clears the session when refresh fails", async () => {

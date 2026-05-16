@@ -9,6 +9,7 @@ import { initSentry } from "./lib/sentry.js";
 import { onError } from "./middleware/error.js";
 import { adminRoutes } from "./routes/admin.routes";
 import { authRoutes } from "./routes/auth.routes";
+import { billingRoutes } from "./routes/billing.routes";
 import { healthRouter } from "./routes/health";
 import { signupRoutes } from "./routes/signup";
 import { tenantRoutes } from "./routes/tenant.routes";
@@ -53,6 +54,7 @@ app.route(
 app.route("/api/v1/auth", authRoutes);
 app.route("/api/v1/signup", signupRoutes);
 app.route("/api/v1/admin", adminRoutes);
+app.route("/api/v1/billing", billingRoutes);
 app.route("/api/v1/t", tenantRoutes);
 
 if (process.env.NODE_ENV !== "test") {
