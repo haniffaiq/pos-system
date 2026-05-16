@@ -144,6 +144,45 @@ describe("processXenditWebhook", () => {
     expect(q).toHaveBeenCalledTimes(3);
   });
 
+  it("does not activate subscriptions when expired Xendit invoices receive later paid callbacks", async () => {
+    const q = queryFromResponses([
+      [
+        {
+          id: "invoice-1",
+          tenant_id: "tenant-1",
+          subscription_id: "subscription-1",
+          status: "expired",
+        },
+      ],
+    ]);
+
+    const out = await processXenditWebhook(
+      { external_id: "BILL-1", id: "xendit-invoice-1", status: "PAID" },
+      { "x-callback-token": "good-token" },
+      q as Query,
+      { webhookToken: "good-token" },
+    );
+
+    expect(out).toEqual({ ok: true, reason: "ignored", status: "paid" });
+    expect(q).toHaveBeenCalledTimes(1);
+    expect(q.mock.calls.map((call) => call[0]).join("\n")).not.toContain("update subscriptions");
+  });
+
+  it("requires provider-scoped order matching for Xendit callbacks", async () => {
+    const q = queryFromResponses([[]]);
+
+    const out = await processXenditWebhook(
+      { external_id: "BILL-midtrans-order", id: "xendit-invoice-1", status: "PAID" },
+      { "x-callback-token": "good-token" },
+      q as Query,
+      { webhookToken: "good-token" },
+    );
+
+    expect(out).toEqual({ ok: true, reason: "unknown_order" });
+    expect(q).toHaveBeenCalledWith(expect.stringContaining("psp_provider = 'xendit'"), ["BILL-midtrans-order"]);
+    expect(q).toHaveBeenCalledTimes(1);
+  });
+
   it("acknowledges unknown verified orders without creating invoice rows", async () => {
     const q = queryFromResponses([[]]);
 

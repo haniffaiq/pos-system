@@ -157,7 +157,7 @@ export async function processXenditWebhook(
     return { ok: true, reason: "already_paid", status: "paid" };
   }
 
-  if (status === "paid") {
+  if (shouldUsePaidTransition(invoice.status, status)) {
     await q(
       `update invoices
           set status = 'paid',
