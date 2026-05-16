@@ -7,6 +7,14 @@ vi.mock("../components/marketing/Hero", () => ({
   Hero: () => <section data-testid="hero">Hero</section>,
 }));
 
+vi.mock("../components/marketing/Header", () => ({
+  Header: ({ locale }: { locale: string }) => <header data-locale={locale} data-testid="marketing-header">Header</header>,
+}));
+
+vi.mock("next-intl/server", () => ({
+  getLocale: () => Promise.resolve("id"),
+}));
+
 vi.mock("../components/marketing/SocialProof", () => ({
   SocialProof: () => <section data-testid="social-proof">Social proof</section>,
 }));
@@ -16,14 +24,16 @@ vi.mock("../components/marketing/Features", () => ({
 }));
 
 describe("home page marketing landing", () => {
-  it("renders the marketing sections in spec order", () => {
-    const html = renderToStaticMarkup(<Home />);
+  it("renders the marketing header and sections in spec order", async () => {
+    const html = renderToStaticMarkup(await Home());
 
+    const headerIndex = html.indexOf('data-testid="marketing-header"');
     const heroIndex = html.indexOf('data-testid="hero"');
     const socialProofIndex = html.indexOf('data-testid="social-proof"');
     const featuresIndex = html.indexOf('data-testid="features"');
 
-    expect(heroIndex).toBeGreaterThanOrEqual(0);
+    expect(headerIndex).toBeGreaterThanOrEqual(0);
+    expect(heroIndex).toBeGreaterThan(headerIndex);
     expect(socialProofIndex).toBeGreaterThan(heroIndex);
     expect(featuresIndex).toBeGreaterThan(socialProofIndex);
   });
