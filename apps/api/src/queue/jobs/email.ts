@@ -40,6 +40,11 @@ export function renderEmail(template: EmailJob["template"], vars: Record<string,
         subject: "Reset your password",
         html: `<p>Hi ${name}, use this link to reset: ${htmlEscape(vars.link)}</p>`,
       };
+    case "signup_verify":
+      return {
+        subject: "Verifikasi akun BroSolution kamu",
+        html: `<p>Terima kasih sudah mendaftar${vars.businessName ? ` untuk ${htmlEscape(vars.businessName)}` : ""}.</p><p>Klik link berikut untuk verifikasi akun kamu dalam 24 jam:</p><p><a href="${htmlEscape(vars.verifyUrl)}">${htmlEscape(vars.verifyUrl)}</a></p>`,
+      };
   }
 }
 
