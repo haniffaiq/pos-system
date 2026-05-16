@@ -8,7 +8,7 @@ import { signAccess, signRefresh, verifyRefresh } from "../lib/jwt";
 import { verifyPassword } from "../lib/password";
 import { redis } from "../lib/redis";
 import { blacklistRefreshToken, isRefreshBlacklisted } from "../lib/refreshBlacklist";
-import { isRefreshValid, revokeRefresh, saveRefresh } from "../lib/refreshStore";
+import { consumeRefresh, revokeRefresh, saveRefresh } from "../lib/refreshStore";
 import { sendMfaEmail } from "./email.service";
 import { decryptStoredSecret, issueEmailOtp, verifyEmailOtp, verifyTotp } from "./mfa.service";
 
@@ -289,12 +289,11 @@ export async function refresh(refreshToken: string): Promise<{ accessToken: stri
     throw new AppError(401, "invalid_refresh", "Refresh token has been revoked");
   }
 
-  if (!(await isRefreshValid(decoded.sub, decoded.jti))) {
+  if (!(await consumeRefresh(decoded.sub, decoded.jti))) {
     await blacklistRefreshToken(decoded, "rotation_reuse");
     throw new AppError(401, "invalid_refresh", "Refresh token has been revoked");
   }
 
-  await revokeRefresh(decoded.sub, decoded.jti);
   await blacklistRefreshToken(decoded, "rotation_reuse");
   return issueTokens({ sub: decoded.sub, tenantId: decoded.tenantId, role: decoded.role });
 }
