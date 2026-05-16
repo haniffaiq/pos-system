@@ -9,6 +9,8 @@ const workerInstances = vi.hoisted(() => [] as Array<{
 }>);
 
 const lowStockAdd = vi.hoisted(() => vi.fn());
+const reconcileInvoicesAdd = vi.hoisted(() => vi.fn());
+const dunningAdd = vi.hoisted(() => vi.fn());
 const logInfo = vi.hoisted(() => vi.fn());
 const logError = vi.hoisted(() => vi.fn());
 const recordQueueJob = vi.hoisted(() => vi.fn());
@@ -46,13 +48,17 @@ vi.mock("./middleware/metrics", () => ({
 }));
 
 vi.mock("./queue/queues", () => ({
-  QUEUE_NAMES: ["provisioning", "email", "low-stock-scan", "export-generation"],
+  QUEUE_NAMES: ["provisioning", "email", "low-stock-scan", "export-generation", "reconcile-invoices", "dunning"],
   lowStockScanQueue: { add: lowStockAdd },
+  reconcileInvoicesQueue: { add: reconcileInvoicesAdd },
+  dunningQueue: { add: dunningAdd },
 }));
 
 afterEach(() => {
   workerInstances.length = 0;
   lowStockAdd.mockReset();
+  reconcileInvoicesAdd.mockReset();
+  dunningAdd.mockReset();
   logInfo.mockReset();
   logError.mockReset();
   recordQueueJob.mockReset();
@@ -65,12 +71,14 @@ describe("worker entrypoint", () => {
 
     const workers = createWorkers();
 
-    expect(workers).toHaveLength(4);
+    expect(workers).toHaveLength(6);
     expect(workerInstances.map((worker) => worker.name)).toEqual([
       "provisioning",
       "email",
       "low-stock-scan",
       "export-generation",
+      "reconcile-invoices",
+      "dunning",
     ]);
     expect(workerInstances.every((worker) => worker.handlers.completed?.length === 1)).toBe(true);
     expect(workerInstances.every((worker) => worker.handlers.failed?.length === 1)).toBe(true);
@@ -101,6 +109,21 @@ describe("worker entrypoint", () => {
     expect(lowStockAdd).toHaveBeenCalledWith("scan", {}, {
       repeat: { pattern: "0 * * * *" },
       jobId: "low-stock-hourly",
+    });
+  });
+
+  it("schedules repeatable billing jobs with stable job IDs", async () => {
+    const { scheduleBillingJobs } = await import("./worker");
+
+    await scheduleBillingJobs();
+
+    expect(reconcileInvoicesAdd).toHaveBeenCalledWith("reconcile-invoices", {}, {
+      repeat: { pattern: "*/15 * * * *" },
+      jobId: "billing-reconcile-invoices",
+    });
+    expect(dunningAdd).toHaveBeenCalledWith("dunning", {}, {
+      repeat: { pattern: "0 * * * *" },
+      jobId: "billing-dunning-hourly",
     });
   });
 
