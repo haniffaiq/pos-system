@@ -12,11 +12,17 @@ declare module "hono" {
 }
 
 function safeRoutePath(c: Parameters<MiddlewareHandler>[0]): string {
-  return c.req.routePath || new URL(c.req.url).pathname;
+  return c.req.routePath || "/:unmatched*";
+}
+
+function safeRequestId(inboundRequestId: string | undefined): string {
+  return inboundRequestId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(inboundRequestId)
+    ? inboundRequestId
+    : randomUUID();
 }
 
 export const requestLogger: MiddlewareHandler = async (c, next) => {
-  const requestId = c.req.header("x-request-id") || randomUUID();
+  const requestId = safeRequestId(c.req.header("x-request-id"));
   const log = logger.child({ request_id: requestId });
   const start = performance.now();
 
