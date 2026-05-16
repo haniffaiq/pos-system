@@ -33,6 +33,11 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      mailhog:
+        image: mailhog/mailhog
+        ports:
+          - 1025:1025
+          - 8025:8025
     env:
       DATABASE_URL: postgres://app:app_password@localhost:5432/operational
       DATABASE_ADMIN_URL: postgres://app_admin:admin_password@localhost:5432/operational
@@ -116,10 +121,11 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter @app/e2e exec playwright install --with-deps chromium
 
-      - name: Seed platform admins for e2e
+      - name: Seed platform admins and plans for e2e
         run: |
           pnpm seed:admin admin@local admin123
           pnpm seed:admin admin@example.test admin123
+          pnpm seed:plans
 
       - name: Start API, worker, and web
         run: |
@@ -157,6 +163,9 @@ jobs:
         env:
           E2E_GROSIR_SLUG: ${{ steps.seed_grosir.outputs.slug }}
         run: pnpm --filter @app/e2e test:phase2
+
+      - name: Run Playwright signup verification gate
+        run: pnpm --filter @app/e2e test:signup
 
       - name: Upload Playwright report
         if: always()
