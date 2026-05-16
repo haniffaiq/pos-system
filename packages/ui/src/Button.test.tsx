@@ -1,6 +1,6 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   Badge,
   Button,
@@ -15,6 +15,8 @@ import {
   Table,
   Toast,
 } from "./index";
+
+afterEach(cleanup);
 
 describe("neo-brutalism UI components", () => {
   it("renders Button with variant fill, black border, hard shadow, and hover-lift classes", () => {
@@ -82,5 +84,50 @@ describe("neo-brutalism UI components", () => {
 
     fireEvent.click(screen.getByText("Proceed?").parentElement?.parentElement as HTMLElement);
     expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds dialog semantics, focuses modal content, traps tab, and closes on escape", () => {
+    const close = vi.fn();
+
+    render(
+      <Modal open onClose={close} title="Edit outlet">
+        <Button>First action</Button>
+        <Button>Second action</Button>
+      </Modal>,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Edit outlet" });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "First action" }));
+
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Second action" }));
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces toasts politely and exposes invalid form errors by description", () => {
+    render(
+      <div>
+        <Toast message="Saved" />
+        <Input label="Cashier" error="Required" />
+        <Select label="Outlet" error="Choose one" defaultValue="">
+          <option value="">Select outlet</option>
+        </Select>
+      </div>,
+    );
+
+    expect(screen.getByRole("status").textContent).toBe("Saved");
+
+    const input = screen.getByLabelText("Cashier");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBeTruthy();
+    expect(document.getElementById(input.getAttribute("aria-describedby") ?? "")?.textContent).toBe("Required");
+
+    const select = screen.getByLabelText("Outlet");
+    expect(select.getAttribute("aria-invalid")).toBe("true");
+    expect(select.getAttribute("aria-describedby")).toBeTruthy();
+    expect(document.getElementById(select.getAttribute("aria-describedby") ?? "")?.textContent).toBe("Choose one");
   });
 });

@@ -8,6 +8,9 @@ export const Select = forwardRef<HTMLSelectElement, Props>(function Select(
 ) {
   const generatedId = useId();
   const selectId = id ?? generatedId;
+  const errorId = `${selectId}-error`;
+  const { "aria-describedby": ariaDescribedBy, ...selectProps } = rest;
+  const describedBy = [ariaDescribedBy, error ? errorId : undefined].filter(Boolean).join(" ") || undefined;
 
   return (
     <div className="block text-fg">
@@ -19,12 +22,14 @@ export const Select = forwardRef<HTMLSelectElement, Props>(function Select(
       <select
         ref={ref}
         id={selectId}
-        {...rest}
+        {...selectProps}
+        aria-invalid={error ? true : selectProps["aria-invalid"]}
+        aria-describedby={describedBy}
         className={`w-full border-2 border-fg rounded-md bg-card px-3 py-2 text-fg shadow-brutal-sm focus:outline-none ${className}`}
       >
         {children}
       </select>
-      {error && <span className="mt-1 block text-xs text-accent font-bold">{error}</span>}
+      {error && <span id={errorId} className="mt-1 block text-xs text-accent font-bold">{error}</span>}
     </div>
   );
 });
