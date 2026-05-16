@@ -30,6 +30,27 @@ describe("logger", () => {
     expect(emitted).not.toContain("ciphertext");
   });
 
+  it("redacts OTP email codes if queue payloads are logged", () => {
+    const writes: string[] = [];
+    const testLogger = createLogger({ write: (msg) => writes.push(msg) });
+
+    testLogger.info(
+      {
+        job: {
+          data: {
+            template: "mfa_otp",
+            vars: { code: "123456" },
+          },
+        },
+      },
+      "email queue job failed",
+    );
+
+    const emitted = writes.join("");
+    expect(emitted).toContain("[REDACTED]");
+    expect(emitted).not.toContain("123456");
+  });
+
   it("exposes a child method", () => {
     const child = logger.child({ scope: "test" });
     expect(typeof child.info).toBe("function");

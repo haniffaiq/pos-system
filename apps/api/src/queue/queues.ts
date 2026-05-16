@@ -12,7 +12,7 @@ export interface ProvisioningJob {
 
 export interface EmailJob {
   to: string;
-  template: "welcome" | "invite" | "password_reset" | "signup_verify";
+  template: "welcome" | "invite" | "password_reset" | "signup_verify" | "mfa_otp";
   vars: Record<string, string>;
 }
 

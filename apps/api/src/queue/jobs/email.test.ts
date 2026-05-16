@@ -29,11 +29,19 @@ describe("renderEmail", () => {
   it("renders the password reset template with escaped reset link", () => {
     const out = renderEmail("password_reset", {
       name: "Ayu",
-      link: "https://example.test/reset?token=<bad>&next=/pos",
+      link: "https://example.test/reset?token=***<bad>&next=/pos",
     });
 
     expect(out.subject).toMatch(/reset/i);
-    expect(out.html).toContain("https://example.test/reset?token=&lt;bad&gt;&amp;next=/pos");
+    expect(out.html).toContain("https://example.test/reset?token=***&lt;bad&gt;&amp;next=/pos");
+  });
+
+  it("renders MFA OTP emails with an escaped code and no surrounding log text", () => {
+    const out = renderEmail("mfa_otp", { code: "123<56" });
+
+    expect(out.subject).toMatch(/verification code/i);
+    expect(out.html).toContain("123&lt;56");
+    expect(out.html).not.toContain("123<56");
   });
 });
 

@@ -16,6 +16,9 @@ export const redactPaths = [
   "*.cookie",
   "set-cookie",
   "*.set-cookie",
+  "vars.code",
+  "data.vars.code",
+  "job.data.vars.code",
 ];
 
 type LogDestination = { write: (msg: string) => void };
