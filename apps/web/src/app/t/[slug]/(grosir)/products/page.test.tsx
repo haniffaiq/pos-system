@@ -10,6 +10,8 @@ vi.mock("@/lib/grosir", () => ({
 
 vi.mock("@/lib/tenant", () => ({
   fetchTenantContext: vi.fn(),
+  tenantContextKey: (slug: string) => ["tenant-ctx", slug],
+  tenantQueryKey: (tenantId: string | null | undefined, ...parts: string[]) => ["tenant", tenantId ?? "unknown", ...parts],
 }));
 
 import { grosirApi } from "@/lib/grosir";
@@ -54,7 +56,7 @@ describe("grosir products page", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    renderWithQuery(<ProductsPage />);
+    renderWithQuery(<ProductsPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Produk")).toBeTruthy();
     expect(await screen.findByText("BRS-5")).toBeTruthy();
@@ -84,7 +86,7 @@ describe("grosir products page", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    renderWithQuery(<ProductsPage />);
+    renderWithQuery(<ProductsPage params={{ slug: "warung-maju" }} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit Beras 5kg" }));
 
@@ -102,7 +104,7 @@ describe("grosir products page", () => {
     });
     vi.mocked(grosirApi).mockResolvedValue([product]);
 
-    renderWithQuery(<ProductsPage />);
+    renderWithQuery(<ProductsPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Beras 5kg")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "+ Produk baru" })).toBeNull();

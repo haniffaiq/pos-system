@@ -27,7 +27,7 @@ describe("ProductForm", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    renderWithQuery(<ProductForm onDone={onDone} />);
+    renderWithQuery(<ProductForm onDone={onDone} tenantId="tenant-1" />);
 
     expect(await screen.findByText("Beras")).toBeTruthy();
     fireEvent.change(screen.getByLabelText("SKU"), { target: { value: "BRS-5" } });

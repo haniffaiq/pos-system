@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Card, Input } from "@app/ui";
 import { grosirApi } from "@/lib/grosir";
-import { fetchTenantContext } from "@/lib/tenant";
+import { fetchTenantContext, tenantContextKey, tenantQueryKey } from "@/lib/tenant";
 
 interface Named {
   id: string;
@@ -15,15 +15,17 @@ interface CrudSectionProps {
   title: string;
   path: string;
   canWrite: boolean;
+  tenantId?: string;
 }
 
-function CrudSection({ title, path, canWrite }: CrudSectionProps) {
+function CrudSection({ title, path, canWrite, tenantId }: CrudSectionProps) {
   const qc = useQueryClient();
   const [name, setName] = useState("");
-  const queryKey = ["grosir-masterdata", path];
+  const queryKey = tenantQueryKey(tenantId, "grosir-masterdata", path);
   const { data = [], isLoading } = useQuery({
     queryKey,
     queryFn: () => grosirApi<Named[]>(path),
+    enabled: Boolean(tenantId),
   });
   const create = useMutation({
     mutationFn: () => grosirApi<Named>(path, { method: "POST", body: JSON.stringify({ name }) }),
@@ -71,8 +73,8 @@ function CrudSection({ title, path, canWrite }: CrudSectionProps) {
   );
 }
 
-export default function MasterDataPage() {
-  const { data: ctx } = useQuery({ queryKey: ["tenant-ctx"], queryFn: fetchTenantContext });
+export default function MasterDataPage({ params }: { params: { slug: string } }) {
+  const { data: ctx } = useQuery({ queryKey: tenantContextKey(params.slug), queryFn: () => fetchTenantContext(params.slug) });
   const canWrite = ctx?.role === "owner" || ctx?.role === "manager";
 
   return (
@@ -82,9 +84,9 @@ export default function MasterDataPage() {
         <p className="mt-1 text-sm text-fg/70">Kelola kategori, satuan, dan supplier grosir.</p>
       </div>
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        <CrudSection title="Kategori" path="/masterdata/categories" canWrite={canWrite} />
-        <CrudSection title="Satuan" path="/masterdata/units" canWrite={canWrite} />
-        <CrudSection title="Supplier" path="/masterdata/suppliers" canWrite={canWrite} />
+        <CrudSection title="Kategori" path="/masterdata/categories" canWrite={canWrite} tenantId={ctx?.tenantId} />
+        <CrudSection title="Satuan" path="/masterdata/units" canWrite={canWrite} tenantId={ctx?.tenantId} />
+        <CrudSection title="Supplier" path="/masterdata/suppliers" canWrite={canWrite} tenantId={ctx?.tenantId} />
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getSession } from "@/lib/auth";
 import { formatRupiah } from "@/lib/format";
 import { grosirApi } from "@/lib/grosir";
-import { fetchTenantContext } from "@/lib/tenant";
+import { fetchTenantContext, tenantContextKey, tenantQueryKey } from "@/lib/tenant";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -59,17 +59,17 @@ async function downloadExport(job: ExportJob): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
-export default function ReportsPage() {
+export default function ReportsPage({ params }: { params: { slug: string } }) {
   const qc = useQueryClient();
   const [from, setFrom] = useState(todayDate);
   const [to, setTo] = useState(todayDate);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  const { data: ctx, isLoading: ctxLoading } = useQuery({ queryKey: ["tenant-ctx"], queryFn: fetchTenantContext });
+  const { data: ctx, isLoading: ctxLoading } = useQuery({ queryKey: tenantContextKey(params.slug), queryFn: () => fetchTenantContext(params.slug) });
   const canRead = ctx?.role === "owner" || ctx?.role === "manager";
   const query = useMemo(() => rangeQuery(from, to), [from, to]);
-  const salesKey = ["grosir-reports", "sales", from, to];
-  const stockKey = ["grosir-reports", "stock", from, to];
-  const exportsKey = ["grosir-reports", "exports"];
+  const salesKey = tenantQueryKey(ctx?.tenantId, "grosir-reports", "sales", from, to);
+  const stockKey = tenantQueryKey(ctx?.tenantId, "grosir-reports", "stock", from, to);
+  const exportsKey = tenantQueryKey(ctx?.tenantId, "grosir-reports", "exports");
 
   const sales = useQuery({
     queryKey: salesKey,

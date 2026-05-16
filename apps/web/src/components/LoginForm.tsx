@@ -11,7 +11,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { setSession } from "@/lib/auth";
 
 interface AuthResponse {
-  user?: { role: string; tenantId: string };
+  user?: { role: string; tenantId: string; tenantSlug?: string | null };
   admin?: { id: string };
 }
 
@@ -68,6 +68,7 @@ export function LoginForm({ mode, slug }: Props) {
     setSession({
       role: response.user?.role ?? "platform_admin",
       tenantId: response.user?.tenantId ?? null,
+      ...(mode === "tenant" ? { tenantSlug: response.user?.tenantSlug ?? slug ?? null } : {}),
     });
     router.push(mode === "admin" ? "/admin" : `/t/${slug}`);
   }

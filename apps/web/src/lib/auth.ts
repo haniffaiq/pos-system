@@ -1,6 +1,7 @@
 export interface Session {
   role: string;
   tenantId: string | null;
+  tenantSlug?: string | null;
 }
 
 type SafeSessionInput = Session & { accessToken?: unknown; refreshToken?: unknown };
@@ -18,7 +19,12 @@ function sanitizeSession(value: unknown): Session | null {
   const candidate = value as Partial<SafeSessionInput>;
   if (typeof candidate.role !== "string") return null;
   if (candidate.tenantId !== null && typeof candidate.tenantId !== "string") return null;
-  return { role: candidate.role, tenantId: candidate.tenantId };
+  if (candidate.tenantSlug !== undefined && candidate.tenantSlug !== null && typeof candidate.tenantSlug !== "string") {
+    return null;
+  }
+  const session: Session = { role: candidate.role, tenantId: candidate.tenantId };
+  if (candidate.tenantSlug !== undefined) session.tenantSlug = candidate.tenantSlug;
+  return session;
 }
 
 export function getSession(): Session | null {
@@ -49,6 +55,7 @@ export function setSession(session: SafeSessionInput): void {
 
   window.localStorage.removeItem(SESSION_KEY);
   const safeSession: Session = { role: session.role, tenantId: session.tenantId };
+  if (session.tenantSlug !== undefined && session.tenantSlug !== null) safeSession.tenantSlug = session.tenantSlug;
   store.setItem(SESSION_KEY, JSON.stringify(safeSession));
 }
 

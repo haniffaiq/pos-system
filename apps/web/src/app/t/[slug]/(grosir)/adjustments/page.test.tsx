@@ -10,6 +10,8 @@ vi.mock("@/lib/grosir", () => ({
 
 vi.mock("@/lib/tenant", () => ({
   fetchTenantContext: vi.fn(),
+  tenantContextKey: (slug: string) => ["tenant-ctx", slug],
+  tenantQueryKey: (tenantId: string | null | undefined, ...parts: string[]) => ["tenant", tenantId ?? "unknown", ...parts],
 }));
 
 import { grosirApi } from "@/lib/grosir";
@@ -49,7 +51,7 @@ describe("grosir stock adjustments page", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    renderWithQuery(<AdjustmentsPage />);
+    renderWithQuery(<AdjustmentsPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Penyesuaian Stok")).toBeTruthy();
     await waitFor(() => expect(screen.getAllByText("Beras 5kg").length).toBeGreaterThan(0));
@@ -72,12 +74,14 @@ describe("grosir stock adjustments page", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    renderWithQuery(<AdjustmentsPage />);
+    renderWithQuery(<AdjustmentsPage params={{ slug: "warung-maju" }} />);
 
+    await screen.findByText("Beras 5kg");
     fireEvent.change(await screen.findByLabelText("Produk"), { target: { value: "prod-1" } });
     fireEvent.change(screen.getByLabelText("Qty signed"), { target: { value: "-5" } });
     fireEvent.change(screen.getByLabelText("Alasan"), { target: { value: "rusak" } });
     fireEvent.change(screen.getByLabelText("Catatan"), { target: { value: "Kemasan robek" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Simpan penyesuaian" }).hasAttribute("disabled")).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "Simpan penyesuaian" }));
 
     await waitFor(() => {
@@ -112,7 +116,7 @@ describe("grosir stock adjustments page", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    renderWithQuery(<AdjustmentsPage />);
+    renderWithQuery(<AdjustmentsPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Beras 5kg")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Simpan penyesuaian" })).toBeNull();

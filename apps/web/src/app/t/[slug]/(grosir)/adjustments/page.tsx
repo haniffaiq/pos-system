@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Badge, Button, Card, Input, Select, Table } from "@app/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { grosirApi } from "@/lib/grosir";
-import { fetchTenantContext } from "@/lib/tenant";
+import { fetchTenantContext, tenantContextKey, tenantQueryKey } from "@/lib/tenant";
 
 interface ApiProduct {
   id: string;
@@ -31,24 +31,26 @@ function reasonLabel(reason: Reason): string {
   return { rusak: "Rusak", hilang: "Hilang", koreksi: "Koreksi" }[reason];
 }
 
-export default function AdjustmentsPage() {
+export default function AdjustmentsPage({ params }: { params: { slug: string } }) {
   const qc = useQueryClient();
   const [productId, setProductId] = useState("");
   const [qtyBase, setQtyBase] = useState(0);
   const [reason, setReason] = useState<Reason>("rusak");
   const [note, setNote] = useState("");
-  const { data: ctx } = useQuery({ queryKey: ["tenant-ctx"], queryFn: fetchTenantContext });
+  const { data: ctx } = useQuery({ queryKey: tenantContextKey(params.slug), queryFn: () => fetchTenantContext(params.slug) });
   const canWrite = ctx?.role === "owner" || ctx?.role === "manager";
-  const productsKey = ["grosir-products"];
-  const adjustmentsKey = ["grosir-adjustments"];
+  const productsKey = tenantQueryKey(ctx?.tenantId, "grosir-products");
+  const adjustmentsKey = tenantQueryKey(ctx?.tenantId, "grosir-adjustments");
 
   const { data: products = [] } = useQuery({
     queryKey: productsKey,
     queryFn: () => grosirApi<ApiProduct[]>("/products"),
+    enabled: Boolean(ctx?.tenantId),
   });
   const { data: adjustments = [], isLoading } = useQuery({
     queryKey: adjustmentsKey,
     queryFn: () => grosirApi<Adjustment[]>("/adjustments"),
+    enabled: Boolean(ctx?.tenantId),
   });
 
   const productById = new Map(products.map((product) => [product.id, product]));

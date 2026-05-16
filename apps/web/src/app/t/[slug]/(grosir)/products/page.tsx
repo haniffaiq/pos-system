@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ProductForm } from "@/components/grosir/ProductForm";
 import { formatRupiah } from "@/lib/format";
 import { grosirApi } from "@/lib/grosir";
-import { fetchTenantContext } from "@/lib/tenant";
+import { fetchTenantContext, tenantContextKey, tenantQueryKey } from "@/lib/tenant";
 
 interface Named {
   id: string;
@@ -65,25 +65,28 @@ function productInput(product: ApiProduct): EditableProduct {
   };
 }
 
-export default function ProductsPage() {
+export default function ProductsPage({ params }: { params: { slug: string } }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<EditableProduct | null>(null);
   const [creating, setCreating] = useState(false);
-  const { data: ctx } = useQuery({ queryKey: ["tenant-ctx"], queryFn: fetchTenantContext });
+  const { data: ctx } = useQuery({ queryKey: tenantContextKey(params.slug), queryFn: () => fetchTenantContext(params.slug) });
   const canWrite = ctx?.role === "owner" || ctx?.role === "manager";
-  const productsKey = ["grosir-products"];
+  const productsKey = tenantQueryKey(ctx?.tenantId, "grosir-products");
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: productsKey,
     queryFn: () => grosirApi<ApiProduct[]>("/products"),
+    enabled: Boolean(ctx?.tenantId),
   });
   const { data: categories = [] } = useQuery({
-    queryKey: ["grosir-masterdata", "/masterdata/categories"],
+    queryKey: tenantQueryKey(ctx?.tenantId, "grosir-masterdata", "/masterdata/categories"),
     queryFn: () => grosirApi<Named[]>("/masterdata/categories"),
+    enabled: Boolean(ctx?.tenantId),
   });
   const { data: units = [] } = useQuery({
-    queryKey: ["grosir-masterdata", "/masterdata/units"],
+    queryKey: tenantQueryKey(ctx?.tenantId, "grosir-masterdata", "/masterdata/units"),
     queryFn: () => grosirApi<Named[]>("/masterdata/units"),
+    enabled: Boolean(ctx?.tenantId),
   });
 
   const categoryNames = byId(categories);
@@ -172,10 +175,10 @@ export default function ProductsPage() {
       </Table>
 
       <Modal open={creating} onClose={() => setCreating(false)} title="Produk baru">
-        <ProductForm onDone={done} />
+        <ProductForm onDone={done} tenantId={ctx?.tenantId} />
       </Modal>
       <Modal open={editing !== null} onClose={() => setEditing(null)} title="Edit produk">
-        {editing && <ProductForm initial={editing} onDone={done} />}
+        {editing && <ProductForm initial={editing} onDone={done} tenantId={ctx?.tenantId} />}
       </Modal>
     </div>
   );

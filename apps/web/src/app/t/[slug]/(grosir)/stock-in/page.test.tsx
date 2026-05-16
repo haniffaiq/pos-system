@@ -10,6 +10,8 @@ vi.mock("@/lib/grosir", () => ({
 
 vi.mock("@/lib/tenant", () => ({
   fetchTenantContext: vi.fn(),
+  tenantContextKey: (slug: string) => ["tenant-ctx", slug],
+  tenantQueryKey: (tenantId: string | null | undefined, ...parts: string[]) => ["tenant", tenantId ?? "unknown", ...parts],
 }));
 
 import { grosirApi } from "@/lib/grosir";
@@ -56,9 +58,10 @@ describe("grosir stock-in page", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    renderWithQuery(<StockInPage />);
+    renderWithQuery(<StockInPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Barang Masuk")).toBeTruthy();
+    await screen.findByText("Gudang Jaya");
     fireEvent.change(await screen.findByLabelText("Supplier"), { target: { value: "supplier-1" } });
     fireEvent.change(screen.getByLabelText("Catatan"), { target: { value: "Restock awal" } });
 
@@ -79,6 +82,7 @@ describe("grosir stock-in page", () => {
     expect(screen.getByText("Total konversi: 51 unit dasar")).toBeTruthy();
     expect(screen.getByText("Total: Rp 258.000")).toBeTruthy();
 
+    await waitFor(() => expect((screen.getByLabelText("Supplier") as HTMLSelectElement).value).toBe("supplier-1"));
     fireEvent.click(screen.getByRole("button", { name: "Simpan barang masuk" }));
 
     await waitFor(() => {
@@ -108,7 +112,7 @@ describe("grosir stock-in page", () => {
     });
     vi.mocked(grosirApi).mockResolvedValue([]);
 
-    renderWithQuery(<StockInPage />);
+    renderWithQuery(<StockInPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Barang Masuk")).toBeTruthy();
     expect(screen.getByText("Owner/manager only")).toBeTruthy();

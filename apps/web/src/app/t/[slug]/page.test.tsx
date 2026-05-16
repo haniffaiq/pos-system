@@ -6,6 +6,8 @@ import TenantDashboard from "./page";
 
 vi.mock("@/lib/tenant", () => ({
   fetchTenantContext: vi.fn(),
+  tenantContextKey: (slug: string) => ["tenant-ctx", slug],
+  tenantQueryKey: (tenantId: string | null | undefined, ...parts: string[]) => ["tenant", tenantId ?? "unknown", ...parts],
 }));
 
 vi.mock("@/lib/grosir", () => ({
@@ -39,7 +41,7 @@ describe("tenant dashboard", () => {
       sector: "retail",
     });
 
-    renderWithQuery(<TenantDashboard />);
+    renderWithQuery(<TenantDashboard params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Module coming soon")).toBeTruthy();
     expect(screen.getByText("retail")).toBeTruthy();
@@ -69,7 +71,7 @@ describe("tenant dashboard", () => {
       invoices: [],
     });
 
-    renderWithQuery(<TenantDashboard />);
+    renderWithQuery(<TenantDashboard params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeTruthy();
     expect(screen.getByText("Penjualan hari ini")).toBeTruthy();
@@ -104,7 +106,7 @@ describe("tenant dashboard", () => {
       topProducts: [],
     });
 
-    renderWithQuery(<TenantDashboard />);
+    renderWithQuery(<TenantDashboard params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeTruthy();
     expect(screen.getByText("Rp 25.000")).toBeTruthy();
@@ -120,7 +122,7 @@ describe("tenant dashboard", () => {
     });
     vi.mocked(grosirApi).mockRejectedValue(new Error("network down"));
 
-    renderWithQuery(<TenantDashboard />);
+    renderWithQuery(<TenantDashboard params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Loading…")).toBeTruthy();
     expect(await screen.findByText("Dashboard belum bisa dimuat.")).toBeTruthy();

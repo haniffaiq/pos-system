@@ -5,6 +5,7 @@ import { Button, Card, Input, Select, Table, Toast } from "@app/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatRupiah } from "@/lib/format";
 import { grosirApi } from "@/lib/grosir";
+import { fetchTenantContext, tenantContextKey, tenantQueryKey } from "@/lib/tenant";
 
 type UnitType = "eceran" | "grosir";
 type PaymentMethod = "cash" | "transfer" | "qris";
@@ -45,7 +46,6 @@ interface SaleResponse {
   change: number;
 }
 
-const productsKey = ["grosir-products", "pos", "active"];
 
 function normalizeProduct(product: ApiProduct): Product {
   return {
@@ -63,11 +63,14 @@ function lineUnitPrice(line: CartLine): number {
   return line.unitType === "grosir" ? line.product.sellPriceGrosir : line.product.sellPriceEceran;
 }
 
-export default function PosPage() {
+export default function PosPage({ params }: { params: { slug: string } }) {
   const qc = useQueryClient();
+  const { data: ctx } = useQuery({ queryKey: tenantContextKey(params.slug), queryFn: () => fetchTenantContext(params.slug) });
+  const productsKey = tenantQueryKey(ctx?.tenantId, "grosir-products", "pos", "active");
   const { data: products = [], isLoading } = useQuery({
     queryKey: productsKey,
     queryFn: async () => (await grosirApi<ApiProduct[]>("/products?activeOnly=true")).map(normalizeProduct),
+    enabled: Boolean(ctx?.tenantId),
   });
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);

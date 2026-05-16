@@ -71,6 +71,7 @@ describe("BillingPage", () => {
 
     await renderPage();
     await flushReact();
+    await flushReact();
 
     expect(container.textContent).toContain("Billing");
     expect(container.textContent).toContain("Free");
@@ -100,7 +101,7 @@ describe("BillingPage", () => {
       root.render(
         <QueryClientProvider client={client}>
           <NextIntlClientProvider locale="en" messages={messages}>
-            <BillingPage />
+            <BillingPage params={{ slug: "warung-maju" }} />
           </NextIntlClientProvider>
         </QueryClientProvider>,
       );
@@ -113,3 +114,9 @@ describe("BillingPage", () => {
     });
   }
 });
+
+vi.mock("@/lib/tenant", () => ({
+  fetchTenantContext: vi.fn(async () => ({ userId: "user-1", tenantId: "tenant-1", tenantSlug: "warung-maju", role: "owner", sector: "grosir" })),
+  tenantContextKey: (slug: string) => ["tenant-ctx", slug],
+  tenantQueryKey: (tenantId: string | null | undefined, ...parts: string[]) => ["tenant", tenantId ?? "unknown", ...parts],
+}));
