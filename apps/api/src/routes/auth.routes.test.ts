@@ -49,6 +49,8 @@ describe("auth routes", () => {
       refreshToken: "refresh-token",
       user: { id: "user-1", tenantId: "tenant-1", email: "u@routeco.test", name: "U", role: "manager" },
     });
+    expect(response.headers.getSetCookie().join(";")).toContain("owa.access=access-token");
+    expect(response.headers.getSetCookie().join(";")).toContain("HttpOnly");
     expect(loginTenantUserMock).toHaveBeenCalledWith("routeco", "u@routeco.test", "secret12");
   });
 
@@ -92,6 +94,20 @@ describe("auth routes", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ refreshToken: "old-refresh" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ accessToken: "new-access", refreshToken: "new-refresh" });
+    expect(response.headers.getSetCookie().join(";")).toContain("owa.access=new-access");
+    expect(refreshMock).toHaveBeenCalledWith("old-refresh");
+  });
+
+  it("POST /refresh can rotate tokens from the HTTP-only refresh cookie", async () => {
+    refreshMock.mockResolvedValueOnce({ accessToken: "new-access", refreshToken: "new-refresh" });
+
+    const response = await testApp().request("/api/v1/auth/refresh", {
+      method: "POST",
+      headers: { cookie: "owa.refresh=old-refresh" },
     });
 
     expect(response.status).toBe(200);

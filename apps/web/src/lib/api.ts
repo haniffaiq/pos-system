@@ -10,11 +10,6 @@ interface UniformErrorBody {
   };
 }
 
-interface RefreshResponse {
-  accessToken: string;
-  refreshToken: string;
-}
-
 export class ApiError extends Error {
   constructor(
     public code: string,
@@ -47,7 +42,7 @@ async function refreshTokens(): Promise<boolean> {
   const response = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ refreshToken: session.refreshToken }),
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -55,8 +50,8 @@ async function refreshTokens(): Promise<boolean> {
     return false;
   }
 
-  const tokens = (await readJson(response)) as RefreshResponse;
-  setSession({ ...session, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+  await readJson(response);
+  setSession(session);
   return true;
 }
 
@@ -67,11 +62,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, retried 
   if (!headers.has("content-type")) {
     headers.set("content-type", "application/json");
   }
-  if (session) {
-    headers.set("authorization", `Bearer ${session.accessToken}`);
-  }
-
-  const response = await fetch(apiUrl(path), { ...init, headers });
+  const response = await fetch(apiUrl(path), { ...init, headers, credentials: "include" });
 
   if (response.status === 401 && !retried && session && (await refreshTokens())) {
     return apiFetch<T>(path, init, true);

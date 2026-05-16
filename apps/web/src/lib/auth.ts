@@ -1,16 +1,23 @@
 export interface Session {
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
   role: string;
   tenantId: string | null;
 }
 
 const SESSION_KEY = "owa.session";
 
-export function getSession(): Session | null {
+function storage(): Storage | null {
   if (typeof window === "undefined") return null;
+  return window.sessionStorage;
+}
 
-  const raw = window.localStorage.getItem(SESSION_KEY);
+export function getSession(): Session | null {
+  const store = storage();
+  if (!store) return null;
+  window.localStorage.removeItem(SESSION_KEY);
+
+  const raw = store.getItem(SESSION_KEY);
   if (!raw) return null;
 
   try {
@@ -22,13 +29,18 @@ export function getSession(): Session | null {
 }
 
 export function setSession(session: Session): void {
-  if (typeof window === "undefined") return;
+  const store = storage();
+  if (!store) return;
 
-  window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  window.localStorage.removeItem(SESSION_KEY);
+  const { accessToken: _accessToken, refreshToken: _refreshToken, ...safeSession } = session;
+  store.setItem(SESSION_KEY, JSON.stringify(safeSession));
 }
 
 export function clearSession(): void {
-  if (typeof window === "undefined") return;
+  const store = storage();
+  if (!store) return;
 
   window.localStorage.removeItem(SESSION_KEY);
+  store.removeItem(SESSION_KEY);
 }
