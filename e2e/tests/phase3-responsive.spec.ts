@@ -4,6 +4,12 @@ const adminEmail = process.env.E2E_ADMIN_EMAIL ?? "admin@local";
 const adminPassword = process.env.E2E_ADMIN_PASSWORD ?? "admin123";
 const tenantSlug = process.env.E2E_GROSIR_SLUG;
 
+const VIEWPORTS = [
+  { name: "mobile", width: 375, height: 667 },
+  { name: "tablet", width: 768, height: 1024 },
+  { name: "desktop", width: 1440, height: 900 },
+] as const;
+
 test.describe.configure({ mode: "serial" });
 
 async function loginAdmin(page: Page) {
@@ -25,6 +31,19 @@ function isNarrow(page: Page): boolean {
   const size = page.viewportSize();
   return !!size && size.width < 768;
 }
+
+test.describe("marketing home", () => {
+  for (const viewport of VIEWPORTS) {
+    test(`home renders at ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto("/", { waitUntil: "commit" });
+
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(page.locator("footer")).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    });
+  }
+});
 
 test.describe("admin shell", () => {
   test("admin login + dashboard layout fits viewport", async ({ page }) => {
