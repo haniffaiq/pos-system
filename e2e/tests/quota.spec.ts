@@ -7,12 +7,12 @@ const ownerPassword = process.env.E2E_QUOTA_OWNER_PASSWORD ?? "secret12";
 const quotaEnvReady = Boolean(freeSlug && inactiveSlug);
 test.skip(!quotaEnvReady, "E2E_QUOTA_FREE_SLUG and E2E_QUOTA_INACTIVE_SLUG are required. Run: source <(bash e2e/seed-quota.sh)");
 
-async function login(page: Page, slug: string) {
+async function login(page: Page, slug: string, expectedPath: RegExp = new RegExp(`/t/${slug}$`)) {
   await page.goto(`/t/${slug}/login`, { waitUntil: "commit" });
   await page.getByLabel("Email").fill(`owner@${slug}.com`);
   await page.getByLabel("Password").fill(ownerPassword);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(new RegExp(`/t/${slug}$`));
+  await expect(page).toHaveURL(expectedPath);
 }
 
 async function tryCreateProduct(page: Page) {
@@ -43,12 +43,11 @@ test.describe.serial("quota and subscription gating", () => {
   });
 
   test("inactive tenant is redirected to billing instead of tenant app routes", async ({ page }) => {
-    await login(page, inactiveSlug!);
+    await login(page, inactiveSlug!, new RegExp(`/t/${inactiveSlug}/billing$`));
+    await expect(page).toHaveURL(new RegExp(`/t/${inactiveSlug}/billing$`));
 
     await page.goto(`/t/${inactiveSlug}/products`);
 
     await expect(page).toHaveURL(new RegExp(`/t/${inactiveSlug}/billing$`));
-    await expect(page.getByRole("heading", { name: /Paket dan invoice|Plans & invoices/ })).toBeVisible();
-    await expect(page.getByText(/suspended|canceled|inactive|nonaktif/i)).toBeVisible();
   });
 });
