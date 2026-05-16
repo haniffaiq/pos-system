@@ -138,5 +138,36 @@
       }
     },
     "rights": "© 2026 BroSolution. Semua hak dilindungi."
+  },
+  "billing": {
+    "title": "Paket dan invoice",
+    "loading": "Memuat billing…",
+    "loadError": "Tidak dapat memuat billing",
+    "currentPlan": "Paket saat ini",
+    "noPlan": "Belum ada paket",
+    "none": "tidak ada",
+    "status": "Status: {status}",
+    "renews": "Diperpanjang: {date}",
+    "upgradePro": "Upgrade Pro",
+    "upgradeBusiness": "Upgrade Business",
+    "invoiceHistory": "Riwayat invoice",
+    "latestInvoices": "Invoice terbaru",
+    "date": "Tanggal",
+    "amount": "Jumlah",
+    "invoiceStatus": "Status",
+    "noInvoices": "Belum ada invoice."
+  },
+  "admin": {
+    "billingPsp": {
+      "title": "PSP Billing",
+      "active": "Aktif: {psp}",
+      "effective": "Efektif: {psp}",
+      "fallback": "Fallback: {psp}",
+      "ready": "{psp}: siap",
+      "missing": "{psp}: kurang {missing}",
+      "invalid": "tidak valid",
+      "none": "tidak ada",
+      "loading": "Memuat pengaturan PSP…"
+    }
   }
 }

@@ -138,5 +138,36 @@
       }
     },
     "rights": "© 2026 BroSolution. All rights reserved."
+  },
+  "billing": {
+    "title": "Plans & invoices",
+    "loading": "Loading billing…",
+    "loadError": "Unable to load billing",
+    "currentPlan": "Current plan",
+    "noPlan": "No plan",
+    "none": "none",
+    "status": "Status: {status}",
+    "renews": "Renews: {date}",
+    "upgradePro": "Upgrade Pro",
+    "upgradeBusiness": "Upgrade Business",
+    "invoiceHistory": "Invoice history",
+    "latestInvoices": "Latest invoices",
+    "date": "Date",
+    "amount": "Amount",
+    "invoiceStatus": "Status",
+    "noInvoices": "No invoices yet."
+  },
+  "admin": {
+    "billingPsp": {
+      "title": "Billing PSP",
+      "active": "Active: {psp}",
+      "effective": "Effective: {psp}",
+      "fallback": "Fallback: {psp}",
+      "ready": "{psp}: ready",
+      "missing": "{psp}: missing {missing}",
+      "invalid": "invalid",
+      "none": "none",
+      "loading": "Loading PSP settings…"
+    }
   }
 }
