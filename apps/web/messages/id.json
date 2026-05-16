@@ -1,0 +1,142 @@
+{
+  "brand": "BroSolution",
+  "tagline": "Solusi Operasional Grosir, Tanpa Ribet.",
+  "nav": {
+    "features": "Fitur",
+    "pricing": "Harga",
+    "faq": "FAQ",
+    "login": "Login",
+    "loginAdmin": "Admin",
+    "loginTenant": "Cari Tenant",
+    "cta": "Coba Gratis 14 Hari"
+  },
+  "hero": {
+    "title": "Kelola Grosirmu Lebih Cepat",
+    "subtitle": "POS, stok, dan laporan dalam satu platform. Dirancang untuk grosir Indonesia.",
+    "ctaPrimary": "Coba Gratis 14 Hari",
+    "ctaSecondary": "Lihat Demo"
+  },
+  "social": "Dipakai oleh UMKM se-Indonesia",
+  "features": {
+    "title": "Fitur Lengkap",
+    "items": {
+      "pos": {
+        "title": "POS Multi-Outlet",
+        "body": "Kasir cepat di banyak cabang sekaligus."
+      },
+      "stock": {
+        "title": "Manajemen Stok",
+        "body": "Lacak masuk-keluar barang real-time."
+      },
+      "report": {
+        "title": "Laporan Real-Time",
+        "body": "Dashboard penjualan + margin per outlet."
+      },
+      "rbac": {
+        "title": "Multi-User & Peran",
+        "body": "Owner, manager, kasir — akses sesuai peran."
+      },
+      "audit": {
+        "title": "Audit Trail",
+        "body": "Siapa ubah apa, kapan. Transparan penuh."
+      },
+      "export": {
+        "title": "Export Excel/CSV",
+        "body": "Tarik data kapan saja untuk laporan pajak."
+      }
+    }
+  },
+  "screenshot": {
+    "title": "Antarmuka yang Familiar",
+    "body": "Tidak butuh training panjang. Kasirmu langsung produktif hari pertama."
+  },
+  "pricing": {
+    "title": "Harga Sederhana",
+    "monthly": "/bulan",
+    "popular": "Paling Populer",
+    "cta": "Mulai Sekarang",
+    "free": {
+      "name": "Free",
+      "price": "Rp 0"
+    },
+    "pro": {
+      "name": "Pro",
+      "price": "Rp 299.000"
+    },
+    "business": {
+      "name": "Business",
+      "price": "Rp 999.000"
+    },
+    "rows": {
+      "users": "Pengguna",
+      "skus": "Produk (SKU)",
+      "tx": "Transaksi/bulan",
+      "exports": "Export/bulan",
+      "outlets": "Cabang",
+      "history": "Riwayat Data",
+      "support": "Dukungan",
+      "api": "API Access",
+      "customDomain": "Custom Domain",
+      "auditUI": "Audit Log UI"
+    }
+  },
+  "faq": {
+    "title": "Pertanyaan Sering Ditanya",
+    "items": {
+      "trial": {
+        "q": "Apakah ada trial gratis?",
+        "a": "Ya, 14 hari Pro penuh tanpa kartu kredit."
+      },
+      "payment": {
+        "q": "Bagaimana cara bayar?",
+        "a": "QRIS, Virtual Account (BCA/Mandiri/BNI/BRI), kartu kredit/debit, dan e-wallet via Midtrans."
+      },
+      "refund": {
+        "q": "Bisakah refund?",
+        "a": "Refund pro-rata jika cancel di tengah periode billing."
+      },
+      "data": {
+        "q": "Siapa pemilik data saya?",
+        "a": "Kamu. Export full data kapan saja, 100% milik tenant."
+      },
+      "branch": {
+        "q": "Multi-cabang?",
+        "a": "Ya, mulai dari Pro mendukung hingga 3 cabang."
+      },
+      "support": {
+        "q": "Dukungan?",
+        "a": "Free: komunitas. Pro: email <24 jam. Business: prioritas + WhatsApp."
+      }
+    }
+  },
+  "footer": {
+    "tagline": "Operasional grosir, tanpa ribet.",
+    "sections": {
+      "product": {
+        "title": "Produk",
+        "features": "Fitur",
+        "pricing": "Harga",
+        "changelog": "Changelog"
+      },
+      "company": {
+        "title": "Perusahaan",
+        "about": "Tentang",
+        "blog": "Blog",
+        "contact": "Kontak"
+      },
+      "resources": {
+        "title": "Sumber Daya",
+        "docs": "Dokumentasi",
+        "api": "API",
+        "status": "Status"
+      },
+      "legal": {
+        "title": "Legal",
+        "privacy": "Privasi",
+        "terms": "Syarat",
+        "security": "Keamanan"
+      }
+    },
+    "rights": "© 2026 BroSolution. Semua hak dilindungi."
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "brand": "BroSolution",
+  "tagline": "Wholesale Operations, Simplified.",
+  "nav": {
+    "features": "Features",
+    "pricing": "Pricing",
+    "faq": "FAQ",
+    "login": "Login",
+    "loginAdmin": "Admin",
+    "loginTenant": "Find Tenant",
+    "cta": "Start 14-Day Free Trial"
+  },
+  "hero": {
+    "title": "Run Your Wholesale Faster",
+    "subtitle": "POS, inventory, and reports in one platform. Built for Indonesian wholesale.",
+    "ctaPrimary": "Start 14-Day Free Trial",
+    "ctaSecondary": "See Demo"
+  },
+  "social": "Trusted by SMBs across Indonesia",
+  "features": {
+    "title": "Complete Features",
+    "items": {
+      "pos": {
+        "title": "Multi-Outlet POS",
+        "body": "Fast cashier across many branches."
+      },
+      "stock": {
+        "title": "Inventory Management",
+        "body": "Real-time in/out tracking."
+      },
+      "report": {
+        "title": "Real-Time Reports",
+        "body": "Sales + margin dashboard per outlet."
+      },
+      "rbac": {
+        "title": "Roles & Users",
+        "body": "Owner, manager, cashier — scoped access."
+      },
+      "audit": {
+        "title": "Audit Trail",
+        "body": "Who changed what, when. Full transparency."
+      },
+      "export": {
+        "title": "Excel/CSV Export",
+        "body": "Pull data anytime for tax reports."
+      }
+    }
+  },
+  "screenshot": {
+    "title": "Familiar Interface",
+    "body": "No long training needed. Your cashier productive on day one."
+  },
+  "pricing": {
+    "title": "Simple Pricing",
+    "monthly": "/month",
+    "popular": "Most Popular",
+    "cta": "Get Started",
+    "free": {
+      "name": "Free",
+      "price": "Rp 0"
+    },
+    "pro": {
+      "name": "Pro",
+      "price": "Rp 299,000"
+    },
+    "business": {
+      "name": "Business",
+      "price": "Rp 999,000"
+    },
+    "rows": {
+      "users": "Users",
+      "skus": "Products (SKU)",
+      "tx": "Transactions/month",
+      "exports": "Exports/month",
+      "outlets": "Outlets",
+      "history": "Data Retention",
+      "support": "Support",
+      "api": "API Access",
+      "customDomain": "Custom Domain",
+      "auditUI": "Audit Log UI"
+    }
+  },
+  "faq": {
+    "title": "Frequently Asked",
+    "items": {
+      "trial": {
+        "q": "Is there a free trial?",
+        "a": "Yes, 14 days of full Pro, no credit card required."
+      },
+      "payment": {
+        "q": "How do I pay?",
+        "a": "QRIS, Virtual Account (BCA/Mandiri/BNI/BRI), credit/debit cards, and e-wallets via Midtrans."
+      },
+      "refund": {
+        "q": "Can I refund?",
+        "a": "Pro-rated refund if you cancel mid billing period."
+      },
+      "data": {
+        "q": "Who owns my data?",
+        "a": "You do. Export all data anytime, 100% tenant-owned."
+      },
+      "branch": {
+        "q": "Multi-branch?",
+        "a": "Yes, Pro and above support up to 3 branches."
+      },
+      "support": {
+        "q": "Support?",
+        "a": "Free: community. Pro: email <24h. Business: priority + WhatsApp."
+      }
+    }
+  },
+  "footer": {
+    "tagline": "Wholesale operations, simplified.",
+    "sections": {
+      "product": {
+        "title": "Product",
+        "features": "Features",
+        "pricing": "Pricing",
+        "changelog": "Changelog"
+      },
+      "company": {
+        "title": "Company",
+        "about": "About",
+        "blog": "Blog",
+        "contact": "Contact"
+      },
+      "resources": {
+        "title": "Resources",
+        "docs": "Documentation",
+        "api": "API",
+        "status": "Status"
+      },
+      "legal": {
+        "title": "Legal",
+        "privacy": "Privacy",
+        "terms": "Terms",
+        "security": "Security"
+      }
+    },
+    "rights": "© 2026 BroSolution. All rights reserved."
+  }
+}
