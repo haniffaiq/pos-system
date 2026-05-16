@@ -11,6 +11,7 @@ const workerInstances = vi.hoisted(() => [] as Array<{
 const lowStockAdd = vi.hoisted(() => vi.fn());
 const reconcileInvoicesAdd = vi.hoisted(() => vi.fn());
 const dunningAdd = vi.hoisted(() => vi.fn());
+const purgeBlacklistAdd = vi.hoisted(() => vi.fn());
 const logInfo = vi.hoisted(() => vi.fn());
 const logError = vi.hoisted(() => vi.fn());
 const recordQueueJob = vi.hoisted(() => vi.fn());
@@ -48,10 +49,11 @@ vi.mock("./middleware/metrics", () => ({
 }));
 
 vi.mock("./queue/queues", () => ({
-  QUEUE_NAMES: ["provisioning", "email", "low-stock-scan", "export-generation", "reconcile-invoices", "dunning"],
+  QUEUE_NAMES: ["provisioning", "email", "low-stock-scan", "export-generation", "reconcile-invoices", "dunning", "purge-refresh-blacklist"],
   lowStockScanQueue: { add: lowStockAdd },
   reconcileInvoicesQueue: { add: reconcileInvoicesAdd },
   dunningQueue: { add: dunningAdd },
+  purgeRefreshBlacklistQueue: { add: purgeBlacklistAdd },
 }));
 
 afterEach(() => {
@@ -59,6 +61,7 @@ afterEach(() => {
   lowStockAdd.mockReset();
   reconcileInvoicesAdd.mockReset();
   dunningAdd.mockReset();
+  purgeBlacklistAdd.mockReset();
   logInfo.mockReset();
   logError.mockReset();
   recordQueueJob.mockReset();
@@ -71,7 +74,7 @@ describe("worker entrypoint", () => {
 
     const workers = createWorkers();
 
-    expect(workers).toHaveLength(6);
+    expect(workers).toHaveLength(7);
     expect(workerInstances.map((worker) => worker.name)).toEqual([
       "provisioning",
       "email",
@@ -79,6 +82,7 @@ describe("worker entrypoint", () => {
       "export-generation",
       "reconcile-invoices",
       "dunning",
+      "purge-refresh-blacklist",
     ]);
     expect(workerInstances.every((worker) => worker.handlers.completed?.length === 1)).toBe(true);
     expect(workerInstances.every((worker) => worker.handlers.failed?.length === 1)).toBe(true);
@@ -124,6 +128,17 @@ describe("worker entrypoint", () => {
     expect(dunningAdd).toHaveBeenCalledWith("dunning", {}, {
       repeat: { pattern: "0 * * * *" },
       jobId: "billing-dunning-hourly",
+    });
+  });
+
+  it("schedules daily refresh blacklist purge with a stable job ID", async () => {
+    const { scheduleRefreshBlacklistPurge } = await import("./worker");
+
+    await scheduleRefreshBlacklistPurge();
+
+    expect(purgeBlacklistAdd).toHaveBeenCalledWith("purge-refresh-blacklist", {}, {
+      repeat: { pattern: "0 3 * * *" },
+      jobId: "refresh-blacklist-daily-purge",
     });
   });
 
