@@ -172,6 +172,11 @@ jobs:
           E2E_GROSIR_SLUG: ${{ steps.seed_grosir.outputs.slug }}
         run: pnpm --filter @app/e2e test:phase2
 
+      - name: Run Playwright Phase 3 responsive gate
+        env:
+          E2E_GROSIR_SLUG: ${{ steps.seed_grosir.outputs.slug }}
+        run: pnpm --filter @app/e2e test:phase3
+
       - name: Run Playwright signup verification gate
         run: pnpm --filter @app/e2e test:signup
 
