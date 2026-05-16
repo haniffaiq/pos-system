@@ -7,12 +7,17 @@ import { signAccess } from "../lib/jwt";
 import { onError } from "../middleware/error";
 import { tenantRoutes } from "./tenant.routes";
 
-const { withAdminMock } = vi.hoisted(() => ({
+const { loadPlanForTenantMock, withAdminMock } = vi.hoisted(() => ({
+  loadPlanForTenantMock: vi.fn(),
   withAdminMock: vi.fn(),
 }));
 
 vi.mock("../db/withTenant", () => ({
   withAdmin: withAdminMock,
+}));
+
+vi.mock("../services/quota.service", () => ({
+  loadPlanForTenant: loadPlanForTenantMock,
 }));
 
 interface TenantLookupRow {
@@ -53,6 +58,8 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  loadPlanForTenantMock.mockResolvedValue({ status: "active", quota: {} });
+  delete process.env.BILLING_ENABLED;
 });
 
 describe("tenant routes", () => {
@@ -122,6 +129,51 @@ describe("tenant routes", () => {
       role: "manager",
       sector: "retail",
     });
+    expect(loadPlanForTenantMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 402 on tenant routes when billing is enabled and the tenant has no active subscription", async () => {
+    process.env.BILLING_ENABLED = "true";
+    const tenantId = "00000000-0000-4000-8000-000000000001";
+    const token = await tenantToken(tenantId);
+    mockTenantLookup(tenantRow("grosir"));
+    loadPlanForTenantMock.mockResolvedValueOnce(null);
+
+    const response = await testApp().request(`/api/v1/t/${tenantId}/me`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(402);
+    expect(await response.json()).toEqual({ code: "SUBSCRIPTION_INACTIVE" });
+    expect(loadPlanForTenantMock).toHaveBeenCalledWith(tenantId);
+  });
+
+  it("allows tenant routes when billing is enabled and the subscription is billable", async () => {
+    process.env.BILLING_ENABLED = "true";
+    const tenantId = "00000000-0000-4000-8000-000000000001";
+    const token = await tenantToken(tenantId, "manager");
+    mockTenantLookup(tenantRow("retail"));
+    loadPlanForTenantMock.mockResolvedValueOnce({ status: "past_due", quota: {} });
+
+    const response = await testApp().request(`/api/v1/t/${tenantId}/me`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ tenantId, role: "manager" });
+    expect(loadPlanForTenantMock).toHaveBeenCalledWith(tenantId);
+  });
+
+  it("does not check billing when tenant auth fails first", async () => {
+    process.env.BILLING_ENABLED = "true";
+    const token = await tenantToken("00000000-0000-4000-8000-000000000001");
+
+    const response = await testApp().request("/api/v1/t/00000000-0000-4000-8000-000000000002/me", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(403);
+    expect(loadPlanForTenantMock).not.toHaveBeenCalled();
   });
 
   it("returns module_coming_soon for sectors without a registered module", async () => {
