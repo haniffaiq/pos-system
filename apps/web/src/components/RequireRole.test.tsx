@@ -13,6 +13,7 @@ vi.mock("next/navigation", () => ({
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  sessionStorage.clear();
   replace.mockClear();
 });
 
