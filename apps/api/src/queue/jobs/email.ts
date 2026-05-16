@@ -53,6 +53,11 @@ export function renderEmail(template: EmailJob["template"], vars: Record<string,
         subject: "Your verification code",
         html: `<p>Your verification code is <strong>${htmlEscape(vars.code)}</strong>. It expires in 5 minutes.</p>`,
       };
+    case "trial_reminder":
+      return {
+        subject: "Your BroSolution trial is ending soon",
+        html: `<p>${htmlEscape(vars.businessName)}, your BroSolution trial ends on ${htmlEscape(vars.trialEndsAt)}.</p>`,
+      };
   }
 }
 

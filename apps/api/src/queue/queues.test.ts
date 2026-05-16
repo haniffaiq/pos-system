@@ -10,6 +10,8 @@ let provisioningQueue: typeof import("./queues")["provisioningQueue"];
 let emailQueue: typeof import("./queues")["emailQueue"];
 let lowStockScanQueue: typeof import("./queues")["lowStockScanQueue"];
 let exportGenerationQueue: typeof import("./queues")["exportGenerationQueue"];
+let reconcileInvoicesQueue: typeof import("./queues")["reconcileInvoicesQueue"];
+let dunningQueue: typeof import("./queues")["dunningQueue"];
 let QUEUE_NAMES: typeof import("./queues")["QUEUE_NAMES"];
 let WORKER_QUEUE_NAMES: typeof import("../worker")["WORKER_QUEUE_NAMES"];
 
@@ -38,6 +40,8 @@ describeWithRedis("queues", () => {
       emailQueue,
       lowStockScanQueue,
       exportGenerationQueue,
+      reconcileInvoicesQueue,
+      dunningQueue,
       QUEUE_NAMES,
     } = await import("./queues"));
     ({ WORKER_QUEUE_NAMES } = await import("../worker"));
@@ -48,6 +52,8 @@ describeWithRedis("queues", () => {
     await emailQueue?.drain(true);
     await lowStockScanQueue?.drain(true);
     await exportGenerationQueue?.drain(true);
+    await reconcileInvoicesQueue?.drain(true);
+    await dunningQueue?.drain(true);
     await cleanupQueueKeys();
   });
 
@@ -56,22 +62,26 @@ describeWithRedis("queues", () => {
     await emailQueue?.close();
     await lowStockScanQueue?.close();
     await exportGenerationQueue?.close();
+    await reconcileInvoicesQueue?.close();
+    await dunningQueue?.close();
     await cleanupQueueKeys();
     await redis?.quit();
   });
 
   it("uses stable queue names that match worker registration", () => {
-    expect(QUEUE_NAMES).toEqual(["provisioning", "email", "low-stock-scan", "export-generation"]);
+    expect(QUEUE_NAMES).toEqual(["provisioning", "email", "low-stock-scan", "export-generation", "reconcile-invoices", "dunning"]);
     expect(WORKER_QUEUE_NAMES).toEqual(QUEUE_NAMES);
 
     expect(provisioningQueue.name).toBe("provisioning");
     expect(emailQueue.name).toBe("email");
     expect(lowStockScanQueue.name).toBe("low-stock-scan");
     expect(exportGenerationQueue.name).toBe("export-generation");
+    expect(reconcileInvoicesQueue.name).toBe("reconcile-invoices");
+    expect(dunningQueue.name).toBe("dunning");
   });
 
   it("sets bounded attempts, backoff, and removal policies on all queues", () => {
-    for (const queue of [provisioningQueue, emailQueue, lowStockScanQueue, exportGenerationQueue]) {
+    for (const queue of [provisioningQueue, emailQueue, lowStockScanQueue, exportGenerationQueue, reconcileInvoicesQueue, dunningQueue]) {
       expect(queue.jobsOpts).toMatchObject({
         attempts: 3,
         backoff: { type: "exponential", delay: 1_000 },

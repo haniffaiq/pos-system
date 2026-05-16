@@ -7,13 +7,19 @@ import { emailProcessor } from "./queue/jobs/email";
 import { exportProcessor } from "./queue/jobs/exportGeneration";
 import { lowStockProcessor } from "./queue/jobs/lowStockScan";
 import { provisioningProcessor } from "./queue/jobs/provisioning";
+import { reconcileInvoicesProcessor } from "./queue/jobs/reconcile-invoices";
+import { dunningProcessor } from "./queue/jobs/dunning";
 import {
+  type DunningJob,
   type EmailJob,
   type ExportGenerationJob,
   type LowStockScanJob,
   type ProvisioningJob,
+  type ReconcileInvoicesJob,
   QUEUE_NAMES,
+  dunningQueue,
   lowStockScanQueue,
+  reconcileInvoicesQueue,
 } from "./queue/queues";
 
 export const WORKER_QUEUE_NAMES = QUEUE_NAMES;
@@ -58,11 +64,18 @@ export function createWorkers(): Worker[] {
     createWorker<EmailJob>("email", emailProcessor),
     createWorker<LowStockScanJob>("low-stock-scan", lowStockProcessor),
     createWorker<ExportGenerationJob>("export-generation", exportGenerationProcessor),
+    createWorker<ReconcileInvoicesJob>("reconcile-invoices", reconcileInvoicesProcessor),
+    createWorker<DunningJob>("dunning", dunningProcessor),
   ];
 }
 
 export async function scheduleLowStockScan(): Promise<void> {
   await lowStockScanQueue.add("scan", {}, { repeat: { pattern: "0 * * * *" }, jobId: "low-stock-hourly" });
+}
+
+export async function scheduleBillingJobs(): Promise<void> {
+  await reconcileInvoicesQueue.add("reconcile-invoices", {}, { repeat: { pattern: "*/15 * * * *" }, jobId: "billing-reconcile-invoices" });
+  await dunningQueue.add("dunning", {}, { repeat: { pattern: "0 * * * *" }, jobId: "billing-dunning-hourly" });
 }
 
 type ShutdownSignal = "SIGTERM" | "SIGINT";
@@ -92,6 +105,7 @@ export async function startWorker(): Promise<Worker[]> {
   const workers = createWorkers();
   installGracefulShutdown(workers);
   await scheduleLowStockScan();
+  await scheduleBillingJobs();
   return workers;
 }
 

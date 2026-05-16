@@ -51,15 +51,27 @@ describe("renderEmail", () => {
   it("renders signup verification through the dedicated BroSolution template", () => {
     const out = renderEmail("signup_verify", {
       businessName: 'ABC "<Grosir>"',
-      verifyUrl: 'https://brosolution.test/verify?code=abc&next="<bad>"',
+      verifyUrl: 'https://brosolution.test/verify?code=***&next="<bad>"',
     });
 
     expect(out.subject).toBe("Verifikasi akun BroSolution kamu");
     expect(out.html).toContain("untuk ABC &quot;&lt;Grosir&gt;&quot;");
     expect(out.html).toContain("dalam 24 jam");
-    expect(out.html).toContain("https://brosolution.test/verify?code=abc&amp;next=&quot;&lt;bad&gt;&quot;");
+    expect(out.html).toContain("https://brosolution.test/verify?code=***&amp;next=&quot;&lt;bad&gt;&quot;");
     expect(out.html).not.toContain("<bad>");
     expect(out.html).not.toContain('"<Grosir>"');
+  });
+
+  it("renders escaped trial reminder email content", () => {
+    const out = renderEmail("trial_reminder", {
+      businessName: "Toko <Best>",
+      trialEndsAt: "2026-05-20T00:00:00.000Z",
+    });
+
+    expect(out.subject).toMatch(/trial is ending soon/i);
+    expect(out.html).toContain("Toko &lt;Best&gt;");
+    expect(out.html).toContain("2026-05-20T00:00:00.000Z");
+    expect(out.html).not.toContain("Toko <Best>");
   });
 });
 
