@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:redis": "REDIS_URL=${REDIS_URL:-redis://localhost:6379} vitest run src/lib/refreshStore.test.ts src/queue/queues.test.ts"
   },
   "dependencies": {
     "@app/shared": "workspace:*",

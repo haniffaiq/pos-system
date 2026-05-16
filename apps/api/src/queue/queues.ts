@@ -45,9 +45,30 @@ const queueOptions = {
   prefix: process.env.BULLMQ_QUEUE_PREFIX,
 };
 
-export const provisioningQueue = new Queue<ProvisioningJob>("provisioning", queueOptions);
-export const emailQueue = new Queue<EmailJob>("email", queueOptions);
-export const lowStockScanQueue = new Queue<LowStockScanJob>("low-stock-scan", queueOptions);
-export const exportGenerationQueue = new Queue<ExportGenerationJob>("export-generation", queueOptions);
+const redisBackedQueuesDisabled = process.env.NODE_ENV === "test" && !process.env.REDIS_URL;
+
+function disabledQueue<T>(name: QueueName): Queue<T> {
+  const fail = async (): Promise<never> => {
+    throw new Error(`REDIS_URL is required to use the ${name} queue in tests`);
+  };
+
+  return {
+    name,
+    jobsOpts: DEFAULT_JOB_OPTIONS,
+    add: fail,
+    getJob: fail,
+    drain: async () => undefined,
+    close: async () => undefined,
+  } as unknown as Queue<T>;
+}
+
+function createQueue<T>(name: QueueName): Queue<T> {
+  return redisBackedQueuesDisabled ? disabledQueue<T>(name) : new Queue<T>(name, queueOptions);
+}
+
+export const provisioningQueue = createQueue<ProvisioningJob>("provisioning");
+export const emailQueue = createQueue<EmailJob>("email");
+export const lowStockScanQueue = createQueue<LowStockScanJob>("low-stock-scan");
+export const exportGenerationQueue = createQueue<ExportGenerationJob>("export-generation");
 
 export const queues = [provisioningQueue, emailQueue, lowStockScanQueue, exportGenerationQueue] as const;
