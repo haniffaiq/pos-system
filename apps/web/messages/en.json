@@ -8,7 +8,9 @@
     "login": "Login",
     "loginAdmin": "Admin",
     "loginTenant": "Find Tenant",
-    "cta": "Start 14-Day Free Trial"
+    "cta": "Start 14-Day Free Trial",
+    "homeAria": "BroSolution home",
+    "sectionsAria": "Marketing navigation"
   },
   "hero": {
     "title": "Run Your Wholesale Faster",
