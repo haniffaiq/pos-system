@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Navbar } from "@app/ui";
 import { RequireRole } from "@/components/RequireRole";
+import { apiFetch } from "@/lib/api";
 import { clearSession } from "@/lib/auth";
 import { fetchTenantContext } from "@/lib/tenant";
 
@@ -21,9 +22,17 @@ export default function TenantLayout({ children, params }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: ctx } = useQuery({ queryKey: ["tenant-ctx"], queryFn: fetchTenantContext });
 
-  function logOut() {
-    clearSession();
-    router.push(`/t/${params.slug}/login`);
+  async function logOut() {
+    try {
+      await apiFetch<{ ok: boolean }>("/auth/logout", { method: "POST" });
+    } catch {
+      // Even if the network request fails, remove client-visible session state so
+      // the browser returns to login. The API clears/revokes cookie sessions when
+      // reachable; failures can be retried by signing in again and logging out.
+    } finally {
+      clearSession();
+      router.push(`/t/${params.slug}/login`);
+    }
   }
 
   const base = `/t/${params.slug}`;

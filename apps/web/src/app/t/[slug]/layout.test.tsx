@@ -16,6 +16,11 @@ vi.mock("@/lib/tenant", () => ({
   fetchTenantContext: vi.fn(),
 }));
 
+vi.mock("@/lib/api", () => ({
+  apiFetch: vi.fn(),
+}));
+
+import { apiFetch } from "@/lib/api";
 import { fetchTenantContext } from "@/lib/tenant";
 
 function renderWithQuery(ui: React.ReactElement) {
@@ -26,6 +31,7 @@ function renderWithQuery(ui: React.ReactElement) {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  sessionStorage.clear();
   vi.clearAllMocks();
 });
 
@@ -85,8 +91,9 @@ describe("tenant layout", () => {
     );
   });
 
-  it("logs out by clearing the tenant session and returning to tenant login", async () => {
+  it("logs out by invalidating the API session, clearing the tenant session, and returning to tenant login", async () => {
     setSession({ accessToken: "access-1", refreshToken: "refresh-1", role: "owner", tenantId: "tenant-1" });
+    vi.mocked(apiFetch).mockResolvedValue({ ok: true });
     vi.mocked(fetchTenantContext).mockResolvedValue({
       userId: "user-1",
       tenantId: "tenant-1",
@@ -102,6 +109,8 @@ describe("tenant layout", () => {
 
     (await screen.findByRole("button", { name: "Log out" })).click();
 
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledWith("/auth/logout", { method: "POST" }));
+    await waitFor(() => expect(sessionStorage.getItem("owa.session")).toBeNull());
     expect(localStorage.getItem("owa.session")).toBeNull();
     expect(push).toHaveBeenCalledWith("/t/warung-maju/login");
   });
