@@ -18,12 +18,14 @@
     "jose": "^5.9.0",
     "nodemailer": "^6.9.0",
     "pg": "^8.13.0",
+    "rate-limiter-flexible": "^11.1.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/nodemailer": "^6.4.0",
     "@types/pg": "^8.11.0",
+    "ioredis-mock": "^8.13.1",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
