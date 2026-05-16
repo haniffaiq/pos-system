@@ -8,6 +8,13 @@ interface UniformErrorBody {
     message?: string;
     details?: unknown;
   };
+  code?: string;
+  message?: string;
+  details?: unknown;
+  metric?: string;
+  limit?: number;
+  current?: number;
+  upgrade_url?: string;
 }
 
 export class ApiError extends Error {
@@ -55,6 +62,35 @@ async function refreshTokens(): Promise<boolean> {
   return true;
 }
 
+function normalizeError(body: unknown): { code: string; message: string; details?: unknown } {
+  const data = body as UniformErrorBody | null;
+  const code = data?.error?.code ?? data?.code ?? "unknown";
+  const message = data?.error?.message ?? data?.message ?? "Request failed";
+  const details = data?.error?.details ?? data?.details ?? (data?.metric ? data : undefined);
+  return { code, message, details };
+}
+
+function redirectTenantToBilling() {
+  if (typeof window === "undefined") return;
+  const [, tenantPrefix, tenantSlug] = window.location.pathname.split("/");
+  if (tenantPrefix !== "t" || !tenantSlug) return;
+  const billingPath = `/t/${tenantSlug}/billing`;
+  if (window.location.pathname !== billingPath) {
+    window.history.pushState({}, "", billingPath);
+  }
+}
+
+function handleQuotaOrSubscriptionError(body: unknown, status: number) {
+  const error = normalizeError(body);
+  if (status === 403 && error.code === "QUOTA_EXCEEDED" && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("quota-exceeded", { detail: error.details ?? body }));
+  }
+  if (status === 402 && error.code === "SUBSCRIPTION_INACTIVE") {
+    redirectTenantToBilling();
+  }
+  return error;
+}
+
 export async function apiFetch<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
   const session = getSession();
   const headers = new Headers(init.headers);
@@ -70,9 +106,8 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, retried 
 
   const body = await readJson(response);
   if (!response.ok) {
-    const uniform = body as UniformErrorBody | null;
-    const error = uniform?.error;
-    throw new ApiError(error?.code ?? "unknown", error?.message ?? "Request failed", response.status, error?.details);
+    const error = handleQuotaOrSubscriptionError(body, response.status);
+    throw new ApiError(error.code, error.message, response.status, error.details);
   }
 
   return body as T;

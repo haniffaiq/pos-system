@@ -55,6 +55,32 @@ describe("apiFetch", () => {
     await expect(apiFetch("/missing")).rejects.toBeInstanceOf(ApiError);
   });
 
+  it("dispatches quota-exceeded details when the API returns QUOTA_EXCEEDED", async () => {
+    const detail = { code: "QUOTA_EXCEEDED", metric: "skus", current: 100, limit: 100, upgrade_url: "/t/demo/billing" };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(detail), { status: 403 })));
+    const handler = vi.fn();
+    window.addEventListener("quota-exceeded", handler);
+
+    await expect(apiFetch("/products", { method: "POST" })).rejects.toMatchObject({
+      code: "QUOTA_EXCEEDED",
+      status: 403,
+      details: expect.objectContaining({ metric: "skus", current: 100, limit: 100 }),
+    });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0][0]).toMatchObject({ detail });
+    window.removeEventListener("quota-exceeded", handler);
+  });
+
+  it("redirects subscription-inactive tenant responses to billing", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ code: "SUBSCRIPTION_INACTIVE" }), { status: 402 })));
+    window.history.pushState({}, "", "/t/demo/products");
+
+    await expect(apiFetch("/products")).rejects.toMatchObject({ code: "SUBSCRIPTION_INACTIVE", status: 402 });
+
+    expect(window.location.pathname).toBe("/t/demo/billing");
+  });
+
   it("uses HTTP-only cookie credentials and retries once after refreshing a 401", async () => {
     setSession({ accessToken: "old-access", refreshToken: "refresh-1", role: "cashier", tenantId: "tenant-1" });
     const fetchMock = vi

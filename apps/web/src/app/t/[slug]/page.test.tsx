@@ -12,6 +12,11 @@ vi.mock("@/lib/grosir", () => ({
   grosirApi: vi.fn(),
 }));
 
+vi.mock("@/lib/api", () => ({
+  apiFetch: vi.fn(),
+}));
+
+import { apiFetch } from "@/lib/api";
 import { grosirApi } from "@/lib/grosir";
 import { fetchTenantContext } from "@/lib/tenant";
 
@@ -57,6 +62,12 @@ describe("tenant dashboard", () => {
         { product_id: "prod-gula", name: "Gula Pasir", qty_sold: 5 },
       ],
     });
+    vi.mocked(apiFetch).mockResolvedValue({
+      plan: { code: "free", name: "Free", priceIdr: 0, quota: { skus: 100, tx_per_month: 1000 } },
+      subscription: { status: "active", currentPeriodEnd: "2026-06-16T00:00:00.000Z" },
+      usage: { skus: 75, tx_per_month: 120 },
+      invoices: [],
+    });
 
     renderWithQuery(<TenantDashboard />);
 
@@ -67,10 +78,16 @@ describe("tenant dashboard", () => {
     expect(screen.getByText("7")).toBeTruthy();
     expect(screen.getByText("Produk stok menipis")).toBeTruthy();
     expect(screen.getByText("3")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Penggunaan kuota" })).toBeTruthy();
+    expect(screen.getByText("Produk (SKU)")).toBeTruthy();
+    expect(screen.getByText("75 / 100")).toBeTruthy();
+    expect(screen.getByText("Transaksi / bulan")).toBeTruthy();
+    expect(screen.getByText("120 / 1.000")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Produk terlaris (30 hari)" })).toBeTruthy();
     expect(screen.getByText("✦ Beras Ramos — 12")).toBeTruthy();
     expect(screen.getByText("✦ Gula Pasir — 5")).toBeTruthy();
     expect(grosirApi).toHaveBeenCalledWith("/dashboard");
+    expect(apiFetch).toHaveBeenCalledWith("/billing/summary");
   });
 
   it("renders the same sales dashboard for cashier tenants", async () => {
