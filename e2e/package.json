@@ -9,7 +9,8 @@
     "test:phase3": "playwright test tests/phase3-responsive.spec.ts",
     "test:signup": "playwright test tests/signup.spec.ts --project=chromium",
     "test:quota": "playwright test tests/quota.spec.ts --project=chromium",
-    "test:billing": "playwright test tests/billing.spec.ts --project=chromium"
+    "test:billing": "playwright test tests/billing.spec.ts --project=chromium",
+    "test:auth": "playwright test tests/auth-mfa.spec.ts --project=chromium"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0"
