@@ -139,10 +139,10 @@ All vars are read from `.env` in dev; injected via deploy environment in prod.
 ## Auth
 | Key | Required | Example | Notes |
 |---|---|---|---|
-| `JWT_SECRET` | yes | (48-byte base64) | Access token signing |
+| `JWT_ACCESS_SECRET` | yes | (48-byte base64) | Access token signing; current runtime env name |
 | `JWT_REFRESH_SECRET` | yes | (48-byte base64) | Refresh token signing |
-| `ACCESS_TTL_SEC` | no | `900` | Default 15min |
-| `REFRESH_TTL_SEC` | no | `2592000` | Default 30d |
+| `ACCESS_TOKEN_TTL` | no | `900` | Default 15min; current runtime env name |
+| `REFRESH_TOKEN_TTL` | no | `1209600` | Default 14d; current runtime env name |
 | `MFA_KMS_KEY` | yes (from P3) | (32-byte base64) | AES-256-GCM key for TOTP seed |
 
 ## Email (SMTP)
@@ -204,7 +204,7 @@ git commit -m "docs: add ENV reference"
 
 ### JWT secrets
 1. Generate: `openssl rand -base64 48`
-2. Update `JWT_SECRET` and `JWT_REFRESH_SECRET` in prod env.
+2. Update `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` in prod env.
 3. Restart `api` and `worker` services.
 4. All existing access tokens invalidated immediately. Users must re-login. Refresh tokens remain valid until next rotation.
 
