@@ -80,6 +80,17 @@
       "api": "API Access",
       "customDomain": "Custom Domain",
       "auditUI": "Audit Log UI"
+    },
+    "values": {
+      "no": "—",
+      "yes": "✓",
+      "unlimited": "∞",
+      "days30": "30 days",
+      "year1": "1 year",
+      "forever": "Forever",
+      "community": "Community",
+      "email24": "Email <24h",
+      "priorityWa": "Priority + WhatsApp"
     }
   },
   "faq": {
@@ -91,7 +102,7 @@
       },
       "payment": {
         "q": "How do I pay?",
-        "a": "QRIS, Virtual Account (BCA/Mandiri/BNI/BRI), credit/debit cards, and e-wallets via Midtrans."
+        "a": "Payments will support Midtrans and Xendit with an admin-selected active PSP; active checkout arrives in the billing phase."
       },
       "refund": {
         "q": "Can I refund?",
