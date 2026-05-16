@@ -1,27 +1,30 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import Home from "./page";
 
-describe("home page scaffold", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
+vi.mock("../components/marketing/Hero", () => ({
+  Hero: () => <section data-testid="hero">Hero</section>,
+}));
 
-  it("renders the neo-brutalist landing card with navigation hints", () => {
+vi.mock("../components/marketing/SocialProof", () => ({
+  SocialProof: () => <section data-testid="social-proof">Social proof</section>,
+}));
+
+vi.mock("../components/marketing/Features", () => ({
+  Features: () => <section data-testid="features">Features</section>,
+}));
+
+describe("home page marketing landing", () => {
+  it("renders the marketing sections in spec order", () => {
     const html = renderToStaticMarkup(<Home />);
 
-    expect(html).toContain("Operational Web App");
-    expect(html).toContain("Go to /admin/login or /t/&lt;slug&gt;/login");
-    expect(html).toContain("border-fg");
-    expect(html).toContain("shadow-brutal");
-  });
+    const heroIndex = html.indexOf('data-testid="hero"');
+    const socialProofIndex = html.indexOf('data-testid="social-proof"');
+    const featuresIndex = html.indexOf('data-testid="features"');
 
-  it("renders NEXT_PUBLIC_API_URL so container runtime env is respected", () => {
-    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://api.internal:4000");
-
-    const html = renderToStaticMarkup(<Home />);
-
-    expect(html).toContain("API URL: http://api.internal:4000");
+    expect(heroIndex).toBeGreaterThanOrEqual(0);
+    expect(socialProofIndex).toBeGreaterThan(heroIndex);
+    expect(featuresIndex).toBeGreaterThan(socialProofIndex);
   });
 });
