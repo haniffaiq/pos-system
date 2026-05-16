@@ -169,5 +169,39 @@
       "none": "none",
       "loading": "Loading PSP settings…"
     }
+  },
+  "signup": {
+    "back": "← Back to home",
+    "title": "Start your 14-day Pro trial",
+    "subtitle": "Create your BroSolution tenant, verify email, and start managing wholesale operations.",
+    "benefits": {
+      "pro": "All Pro features are active during trial",
+      "noCard": "No credit card required at signup",
+      "verify": "Verification link is sent to the owner email"
+    },
+    "fields": {
+      "email": "Work email",
+      "password": "Password",
+      "businessName": "Business name",
+      "slug": "Tenant slug"
+    },
+    "slugHelp": "Used for your tenant URL, for example: warung-maju.",
+    "submit": "Create account",
+    "loading": "Creating account…",
+    "success": "Check your email for the verification link.",
+    "genericError": "Signup failed. Check the form and try again.",
+    "networkError": "Could not reach the server. Please try again shortly."
+  },
+  "verify": {
+    "verifyingTitle": "Verifying your account…",
+    "verifyingBody": "One moment while we prepare your tenant.",
+    "successTitle": "Verification complete",
+    "success": "Success! Redirecting to tenant login…",
+    "errorTitle": "Verification failed",
+    "missingToken": "Verification token is missing.",
+    "invalidToken": "The token is invalid or expired.",
+    "missingSlug": "The tenant was verified but no slug was returned.",
+    "networkError": "Could not reach the verification server. Please try again shortly.",
+    "retry": "Back to signup"
   }
 }
