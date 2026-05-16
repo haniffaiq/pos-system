@@ -7,6 +7,7 @@ import { emailProcessor } from "./queue/jobs/email";
 import { exportProcessor } from "./queue/jobs/exportGeneration";
 import { lowStockProcessor } from "./queue/jobs/lowStockScan";
 import { provisioningProcessor } from "./queue/jobs/provisioning";
+import { purgeBlacklistProcessor } from "./queue/jobs/purgeBlacklist";
 import { reconcileInvoicesProcessor } from "./queue/jobs/reconcile-invoices";
 import { dunningProcessor } from "./queue/jobs/dunning";
 import {
@@ -15,10 +16,12 @@ import {
   type ExportGenerationJob,
   type LowStockScanJob,
   type ProvisioningJob,
+  type PurgeRefreshBlacklistJob,
   type ReconcileInvoicesJob,
   QUEUE_NAMES,
   dunningQueue,
   lowStockScanQueue,
+  purgeRefreshBlacklistQueue,
   reconcileInvoicesQueue,
 } from "./queue/queues";
 
@@ -66,6 +69,7 @@ export function createWorkers(): Worker[] {
     createWorker<ExportGenerationJob>("export-generation", exportGenerationProcessor),
     createWorker<ReconcileInvoicesJob>("reconcile-invoices", reconcileInvoicesProcessor),
     createWorker<DunningJob>("dunning", dunningProcessor),
+    createWorker<PurgeRefreshBlacklistJob>("purge-refresh-blacklist", purgeBlacklistProcessor),
   ];
 }
 
@@ -76,6 +80,13 @@ export async function scheduleLowStockScan(): Promise<void> {
 export async function scheduleBillingJobs(): Promise<void> {
   await reconcileInvoicesQueue.add("reconcile-invoices", {}, { repeat: { pattern: "*/15 * * * *" }, jobId: "billing-reconcile-invoices" });
   await dunningQueue.add("dunning", {}, { repeat: { pattern: "0 * * * *" }, jobId: "billing-dunning-hourly" });
+}
+
+export async function scheduleRefreshBlacklistPurge(): Promise<void> {
+  await purgeRefreshBlacklistQueue.add("purge-refresh-blacklist", {}, {
+    repeat: { pattern: "0 3 * * *" },
+    jobId: "refresh-blacklist-daily-purge",
+  });
 }
 
 type ShutdownSignal = "SIGTERM" | "SIGINT";
@@ -106,6 +117,7 @@ export async function startWorker(): Promise<Worker[]> {
   installGracefulShutdown(workers);
   await scheduleLowStockScan();
   await scheduleBillingJobs();
+  await scheduleRefreshBlacklistPurge();
   return workers;
 }
 

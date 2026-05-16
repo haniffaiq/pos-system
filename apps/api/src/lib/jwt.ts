@@ -74,7 +74,7 @@ export async function verifyAccess(token: string): Promise<JwtPayload> {
   }
 }
 
-export async function verifyRefresh(token: string): Promise<JwtPayload & { jti: string }> {
+export async function verifyRefresh(token: string): Promise<JwtPayload & { jti: string; exp: number }> {
   try {
     const { payload } = await jwtVerify(token, refreshSecret());
     if (payload[TOKEN_TYPE_CLAIM] !== REFRESH_TOKEN_TYPE) {
@@ -84,11 +84,16 @@ export async function verifyRefresh(token: string): Promise<JwtPayload & { jti: 
       throw new Error("invalid refresh token jti");
     }
 
+    if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp)) {
+      throw new Error("invalid refresh token expiration");
+    }
+
     return {
       sub: requireSubject(payload.sub, "refresh"),
       tenantId: readTenantId(payload.tenantId),
       role: readRole(payload.role),
       jti: payload.jti,
+      exp: payload.exp,
     };
   } catch (error) {
     throw wrapJwtError(error, "refresh");

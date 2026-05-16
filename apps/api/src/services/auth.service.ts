@@ -6,6 +6,7 @@ import { AppError } from "../lib/errors";
 import { signAccess, signRefresh, verifyRefresh } from "../lib/jwt";
 import { verifyPassword } from "../lib/password";
 import { redis } from "../lib/redis";
+import { blacklistRefreshToken, isRefreshBlacklisted } from "../lib/refreshBlacklist";
 import { isRefreshValid, revokeRefresh, saveRefresh } from "../lib/refreshStore";
 import { sendMfaEmail } from "./email.service";
 import { decryptStoredSecret, issueEmailOtp, verifyEmailOtp, verifyTotp } from "./mfa.service";
@@ -222,26 +223,36 @@ export async function verifyMfaChallenge(
 }
 
 export async function refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
-  let decoded: JwtPayload & { jti: string };
+  let decoded: JwtPayload & { jti: string; exp: number };
   try {
     decoded = await verifyRefresh(refreshToken);
   } catch {
     throw new AppError(401, "invalid_refresh", "Refresh token is invalid or expired");
   }
 
+  if (await isRefreshBlacklisted(decoded.jti)) {
+    throw new AppError(401, "invalid_refresh", "Refresh token has been revoked");
+  }
+
   if (!(await isRefreshValid(decoded.sub, decoded.jti))) {
+    await blacklistRefreshToken(decoded, "rotation_reuse");
     throw new AppError(401, "invalid_refresh", "Refresh token has been revoked");
   }
 
   await revokeRefresh(decoded.sub, decoded.jti);
+  await blacklistRefreshToken(decoded, "rotation_reuse");
   return issueTokens({ sub: decoded.sub, tenantId: decoded.tenantId, role: decoded.role });
 }
 
 export async function logout(refreshToken: string): Promise<void> {
+  let decoded: JwtPayload & { jti: string; exp: number };
   try {
-    const decoded = await verifyRefresh(refreshToken);
-    await revokeRefresh(decoded.sub, decoded.jti);
+    decoded = await verifyRefresh(refreshToken);
   } catch {
     // Invalid/expired refresh tokens are already logged out from the server perspective.
+    return;
   }
+
+  await revokeRefresh(decoded.sub, decoded.jti);
+  await blacklistRefreshToken(decoded, "logout");
 }

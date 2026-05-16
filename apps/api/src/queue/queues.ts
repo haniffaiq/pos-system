@@ -2,7 +2,15 @@ import { Queue, type JobsOptions } from "bullmq";
 
 import { redis } from "../lib/redis";
 
-export const QUEUE_NAMES = ["provisioning", "email", "low-stock-scan", "export-generation", "reconcile-invoices", "dunning"] as const;
+export const QUEUE_NAMES = [
+  "provisioning",
+  "email",
+  "low-stock-scan",
+  "export-generation",
+  "reconcile-invoices",
+  "dunning",
+  "purge-refresh-blacklist",
+] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];
 
@@ -27,6 +35,7 @@ export type SignupVerifyEmailJob = EmailJob & {
 export type LowStockScanJob = Record<string, never>;
 export type ReconcileInvoicesJob = Record<string, never>;
 export type DunningJob = Record<string, never>;
+export type PurgeRefreshBlacklistJob = Record<string, never>;
 
 export interface ExportGenerationJob {
   tenantId: string;
@@ -82,5 +91,14 @@ export const lowStockScanQueue = createQueue<LowStockScanJob>("low-stock-scan");
 export const exportGenerationQueue = createQueue<ExportGenerationJob>("export-generation");
 export const reconcileInvoicesQueue = createQueue<ReconcileInvoicesJob>("reconcile-invoices");
 export const dunningQueue = createQueue<DunningJob>("dunning");
+export const purgeRefreshBlacklistQueue = createQueue<PurgeRefreshBlacklistJob>("purge-refresh-blacklist");
 
-export const queues = [provisioningQueue, emailQueue, lowStockScanQueue, exportGenerationQueue, reconcileInvoicesQueue, dunningQueue] as const;
+export const queues = [
+  provisioningQueue,
+  emailQueue,
+  lowStockScanQueue,
+  exportGenerationQueue,
+  reconcileInvoicesQueue,
+  dunningQueue,
+  purgeRefreshBlacklistQueue,
+] as const;
