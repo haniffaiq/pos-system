@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 
 import { AppError } from "../lib/errors.js";
 import { logger, toLogError } from "../lib/logger";
+import { Sentry } from "../lib/sentry.js";
 
 export function onError(err: Error, c: Context): Response {
   if (err instanceof AppError) {
@@ -33,5 +34,6 @@ export function onError(err: Error, c: Context): Response {
   }
 
   logger.error({ error: toLogError(err) }, "unhandled request error");
+  Sentry.captureException(err);
   return c.json({ error: { code: "internal_error", message: "Something went wrong" } }, 500);
 }

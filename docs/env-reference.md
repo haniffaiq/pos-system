@@ -89,7 +89,11 @@ Both Midtrans and Xendit must be supportable. A deployment may configure one or 
 | Key | Required | Example | Notes |
 |---|---:|---|---|
 | `SENTRY_DSN` | prod | `https://example@sentry.brosolution.id/1` | API/worker Sentry DSN; empty disables Sentry initialization. |
+| `SENTRY_ENVIRONMENT` | no | `staging` | API/worker Sentry environment tag; falls back to `NODE_ENV`. |
+| `SENTRY_RELEASE` | no | `api@2026.05.16` | Sentry release tag for API and as web fallback. |
 | `NEXT_PUBLIC_SENTRY_DSN` | prod web | `https://example@sentry.brosolution.id/2` | Browser-visible Sentry DSN for Next.js. |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | no | `production` | Browser-visible Sentry environment tag; falls back to `NODE_ENV`. |
+| `NEXT_PUBLIC_SENTRY_RELEASE` | no | `web@2026.05.16` | Browser-visible Sentry release tag; falls back to `SENTRY_RELEASE`. |
 | `LOG_LEVEL` | no | `info` | `trace`, `debug`, `info`, `warn`, or `error`. |
 | `PROMETHEUS_METRICS_ENABLED` | P1 | `true` | Planned `/metrics` exposure flag. |
 | `LOKI_URL` | P1 | `http://loki:3100` | Planned log shipping target if app-side shipping is used. |

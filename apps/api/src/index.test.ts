@@ -26,6 +26,17 @@ import { app } from "./index";
 import { AppError } from "./lib/errors";
 import { onError } from "./middleware/error";
 
+const { captureExceptionMock } = vi.hoisted(() => ({
+  captureExceptionMock: vi.fn(),
+}));
+
+vi.mock("./lib/sentry.js", () => ({
+  initSentry: vi.fn(),
+  Sentry: {
+    captureException: captureExceptionMock,
+  },
+}));
+
 describe("api app skeleton", () => {
   beforeEach(() => {
     mocks.adminQuery.mockResolvedValue({ rows: [{ healthcheck: 1 }] });
@@ -126,6 +137,7 @@ describe("Hono error middleware", () => {
   });
 
   it("sanitizes unknown errors as internal_error and logs the original error", async () => {
+    captureExceptionMock.mockClear();
     const testApp = new Hono();
     testApp.onError(onError);
     testApp.get("/boom", () => {
@@ -140,5 +152,7 @@ describe("Hono error middleware", () => {
     });
     expect(mocks.logError).toHaveBeenCalledOnce();
     expect(mocks.logError).toHaveBeenCalledWith({ error: { name: "Error" } }, "unhandled request error");
+    expect(captureExceptionMock).toHaveBeenCalledOnce();
+    expect(captureExceptionMock).toHaveBeenCalledWith(expect.any(Error));
   });
 });
