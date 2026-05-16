@@ -18,4 +18,11 @@ curl -fsS "$API_BASE_URL/api/v1/admin/tenants" \
   -d "{\"name\":\"E2E Grosir\",\"slug\":\"$SLUG\",\"sector\":\"grosir\",\"ownerEmail\":\"owner@$SLUG.com\",\"ownerPassword\":\"secret12\"}" \
   >/dev/null
 
+# Quota-gated routes require a tenant subscription. The billing seed is
+# idempotent and backfills a default business subscription for newly seeded
+# tenants; keep stdout clean because the caller captures only the slug.
+if [ -n "${DATABASE_ADMIN_URL:-}" ]; then
+  pnpm seed:plans >/dev/null
+fi
+
 echo "$SLUG"

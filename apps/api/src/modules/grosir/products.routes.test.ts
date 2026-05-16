@@ -6,12 +6,24 @@ import { onError } from "../../middleware/error";
 import { productsRoutes } from "./products.routes";
 import { createProduct, getProduct, listProducts, setProductActive, updateProduct } from "./products.service";
 
+const loadPlanForTenant = vi.hoisted(() => vi.fn());
+const countResource = vi.hoisted(() => vi.fn());
+const isOverQuota = vi.hoisted(() => vi.fn());
+
 vi.mock("./products.service", () => ({
   createProduct: vi.fn(),
   getProduct: vi.fn(),
   listProducts: vi.fn(),
   setProductActive: vi.fn(),
   updateProduct: vi.fn(),
+}));
+
+vi.mock("../../services/quota.service", () => ({
+  loadPlanForTenant,
+  countResource,
+  currentMonthlyUsage: vi.fn(),
+  incrementUsage: vi.fn(),
+  isOverQuota,
 }));
 
 const tenantId = "00000000-0000-4000-8000-000000000001";
@@ -44,7 +56,13 @@ function testApp(role: JwtPayload["role"] = "manager") {
   return app;
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  process.env.PUBLIC_APP_URL = "https://app.example.test";
+  loadPlanForTenant.mockResolvedValue({ status: "active", quota: { skus: 10 } });
+  countResource.mockResolvedValue(1);
+  isOverQuota.mockImplementation((limit: number, current: number) => current >= limit && limit >= 0);
+});
 
 describe("products routes", () => {
   it("allows cashiers to list and fetch products", async () => {
@@ -109,6 +127,41 @@ describe("products routes", () => {
     });
 
     expect(response.status).toBe(403);
+    expect(createProduct).not.toHaveBeenCalled();
+  });
+
+  it("rejects product creation when the SKU quota is exhausted", async () => {
+    loadPlanForTenant.mockResolvedValueOnce({ status: "active", quota: { skus: 2 } });
+    countResource.mockResolvedValueOnce(2);
+    const input = {
+      sku: "BRS-1",
+      name: "Beras Premium",
+      baseUnitId: unitId,
+      buyPrice: 12000,
+      sellPriceEceran: 14000,
+      sellPriceGrosir: 135000,
+      minStock: 5,
+    };
+
+    const response = await testApp("manager").request("/products", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "QUOTA_EXCEEDED",
+        message: "Quota exceeded",
+        details: {
+          metric: "skus",
+          limit: 2,
+          current: 2,
+          upgrade_url: `https://app.example.test/t/${tenantId}/billing`,
+        },
+      },
+    });
     expect(createProduct).not.toHaveBeenCalled();
   });
 });

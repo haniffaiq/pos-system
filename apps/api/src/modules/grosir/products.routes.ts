@@ -2,6 +2,7 @@ import { productSchema, type JwtPayload } from "@app/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { enforceQuota } from "../../middleware/enforceQuota";
 import { requireRole } from "../../middleware/requireRole";
 import { createProduct, getProduct, listProducts, setProductActive, updateProduct } from "./products.service";
 
@@ -20,7 +21,7 @@ productsRoutes.get("/", async (c) =>
 
 productsRoutes.get("/:id", async (c) => c.json(await getProduct(c.get("auth").tenantId!, idSchema.parse(c.req.param("id")))));
 
-productsRoutes.post("/", requireRole("owner", "manager"), async (c) => {
+productsRoutes.post("/", requireRole("owner", "manager"), enforceQuota("skus"), async (c) => {
   const input = productSchema.parse(await c.req.json());
   return c.json(await createProduct(c.get("auth").tenantId!, input), 201);
 });
