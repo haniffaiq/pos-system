@@ -113,6 +113,9 @@ jobs:
       - name: Run unit and integration tests
         run: pnpm test
 
+      - name: Check i18n catalog key coverage
+        run: pnpm --filter @app/web i18n:check
+
       - name: Build API and web
         run: |
           pnpm --filter @app/api build

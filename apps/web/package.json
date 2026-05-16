@@ -5,7 +5,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "i18n:check": "tsx scripts/check-i18n.ts"
   },
   "dependencies": {
     "@app/shared": "workspace:*",
