@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   signAccess: vi.fn(),
   signRefresh: vi.fn(),
   isRefreshValid: vi.fn(),
+  consumeRefresh: vi.fn(),
   revokeRefresh: vi.fn(),
   saveRefresh: vi.fn(),
   isRefreshBlacklisted: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock("../lib/jwt", () => ({
 
 vi.mock("../lib/refreshStore", () => ({
   isRefreshValid: mocks.isRefreshValid,
+  consumeRefresh: mocks.consumeRefresh,
   revokeRefresh: mocks.revokeRefresh,
   saveRefresh: mocks.saveRefresh,
 }));
@@ -68,6 +70,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.verifyRefresh.mockResolvedValue(decodedUserRefresh);
   mocks.isRefreshValid.mockResolvedValue(true);
+  mocks.consumeRefresh.mockResolvedValue(true);
   mocks.isRefreshBlacklisted.mockResolvedValue(false);
   mocks.signAccess.mockResolvedValue("new-access");
   mocks.signRefresh.mockResolvedValue({ token: "new-refresh", jti: "jti-2" });
@@ -86,6 +89,22 @@ describe("auth.service refresh-token blacklist", () => {
     expect(mocks.isRefreshValid).not.toHaveBeenCalled();
     expect(mocks.revokeRefresh).not.toHaveBeenCalled();
     expect(mocks.signRefresh).not.toHaveBeenCalled();
+  });
+
+  it("allows only one simultaneous rotation for the same refresh jti", async () => {
+    mocks.consumeRefresh.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    const results = await Promise.allSettled([refresh("same-refresh-token"), refresh("same-refresh-token")]);
+    const fulfilled = results.filter((result) => result.status === "fulfilled");
+    const rejected = results.filter((result) => result.status === "rejected");
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]).toMatchObject({
+      reason: { status: 401, code: "invalid_refresh" },
+    });
+    expect(mocks.blacklistRefreshToken).toHaveBeenCalledWith(decodedUserRefresh, "rotation_reuse");
+    expect(mocks.signRefresh).toHaveBeenCalledTimes(1);
   });
 
   it("persists the refresh token jti to the durable blacklist on logout", async () => {

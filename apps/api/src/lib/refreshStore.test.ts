@@ -5,6 +5,7 @@ const describeWithRedis = process.env.REDIS_URL ? describe : describe.skip;
 let redis: typeof import("./redis")["redis"];
 let saveRefresh: typeof import("./refreshStore")["saveRefresh"];
 let isRefreshValid: typeof import("./refreshStore")["isRefreshValid"];
+let consumeRefresh: typeof import("./refreshStore")["consumeRefresh"];
 let revokeRefresh: typeof import("./refreshStore")["revokeRefresh"];
 
 const testNamespace = `test-${process.pid}-${Date.now()}`;
@@ -29,7 +30,7 @@ async function cleanupRefreshKeys(): Promise<void> {
 describeWithRedis("refresh store", () => {
   beforeAll(async () => {
     ({ redis } = await import("./redis"));
-    ({ saveRefresh, isRefreshValid, revokeRefresh } = await import("./refreshStore"));
+    ({ saveRefresh, isRefreshValid, consumeRefresh, revokeRefresh } = await import("./refreshStore"));
   });
 
   afterEach(async () => {
@@ -58,5 +59,14 @@ describeWithRedis("refresh store", () => {
     await revokeRefresh(user("user2"), "jti-2");
 
     expect(await isRefreshValid(user("user2"), "jti-2")).toBe(false);
+  });
+
+  it("atomically consumes a saved jti exactly once", async () => {
+    await saveRefresh(user("user3"), "jti-3", 60, "csrf-token");
+
+    const [first, second] = await Promise.all([consumeRefresh(user("user3"), "jti-3"), consumeRefresh(user("user3"), "jti-3")]);
+
+    expect([first, second].filter(Boolean)).toHaveLength(1);
+    expect(await isRefreshValid(user("user3"), "jti-3")).toBe(false);
   });
 });

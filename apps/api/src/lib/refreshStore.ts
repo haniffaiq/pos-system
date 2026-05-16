@@ -23,6 +23,20 @@ export async function isRefreshValid(userId: string, jti: string): Promise<boole
   return (await redis.exists(key(userId, jti))) === 1;
 }
 
+export async function consumeRefresh(userId: string, jti: string): Promise<boolean> {
+  const consumed = await redis.eval(
+    `local current = redis.call("GET", KEYS[1])
+     if not current then
+       return 0
+     end
+     redis.call("DEL", KEYS[1])
+     return 1`,
+    1,
+    key(userId, jti)
+  );
+  return consumed === 1;
+}
+
 export async function revokeRefresh(userId: string, jti: string): Promise<void> {
   await redis.del(key(userId, jti));
 }
