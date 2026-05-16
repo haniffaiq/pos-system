@@ -22,7 +22,7 @@ This runbook is the operator-facing stub for BroSolution / Operational Grosir pr
 
 ### JWT and session secrets
 
-Use this for `JWT_SECRET`, `JWT_REFRESH_SECRET`, and future session-signing secrets.
+Use this for current runtime secrets `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`, plus future session-signing secrets.
 
 1. Generate new values:
 
@@ -85,7 +85,7 @@ Use this for `MFA_KMS_KEY`.
 ### SMTP secrets
 
 1. Rotate credentials in the mail provider console.
-2. Update `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM` if needed.
+2. Update `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_FROM` if needed.
 3. Restart worker and API if both send email.
 4. Send test emails for signup verification, MFA OTP fallback, and billing reminders.
 
@@ -98,8 +98,8 @@ Rotate one provider at a time.
 1. In the provider dashboard, create the new key pair without deleting the old key yet.
 2. Update the relevant environment values:
    - Midtrans: `MIDTRANS_ENV`, `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY`, `MIDTRANS_MERCHANT_ID`.
-   - Xendit: `XENDIT_SECRET_KEY`, `XENDIT_PUBLIC_KEY` if used, `XENDIT_WEBHOOK_TOKEN`, and account/business identifiers required by the implementation.
-   - Shared billing controls: `BILLING_ENABLED`, `BILLING_ACTIVE_PROVIDER`, and provider fallback/readiness flags when introduced.
+   - Xendit: `XENDIT_ENV`, `XENDIT_SECRET_KEY`, `XENDIT_PUBLIC_KEY` if used, and `XENDIT_WEBHOOK_TOKEN`.
+   - Shared billing controls: `BILLING_ENABLED` and `BILLING_ACTIVE_PSP` (`midtrans` or `xendit`). Runtime must validate the active PSP and fall back to the other configured provider if active PSP config is incomplete.
 3. Restart API and worker.
 4. Run provider readiness checks for both providers. The active provider must pass before it is selected as active in admin config.
 5. Send a sandbox checkout and webhook replay for the rotated provider.

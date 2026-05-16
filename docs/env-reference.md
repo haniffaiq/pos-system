@@ -1,0 +1,118 @@
+# Environment Variables Reference
+
+All variables are read from `.env` during local development and injected by the deployment environment in production. Keep `.env` untracked; use `.env.example` for placeholder-only examples.
+
+## Naming compatibility
+
+Use the runtime names already read by the codebase. Do not rename these without adding compatibility in code:
+
+- Auth secrets: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`.
+- Token TTLs: `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL` (seconds).
+- SMTP password: `SMTP_PASSWORD`.
+- Billing provider selector: `BILLING_ACTIVE_PSP` (`midtrans` or `xendit`).
+
+Avoid older/planned aliases such as `JWT_SECRET`, `ACCESS_TTL_SEC`, `REFRESH_TTL_SEC`, `SMTP_PASS`, or `BILLING_ACTIVE_PROVIDER` unless a future PR adds explicit runtime compatibility.
+
+## Core database, Redis, and queues
+
+| Key | Required | Example | Notes |
+|---|---:|---|---|
+| `POSTGRES_DB` | dev compose | `operational` | Local Docker Compose database name. |
+| `POSTGRES_USER` | dev compose | `postgres` | Local superuser for bootstrap only. |
+| `POSTGRES_PASSWORD` | dev compose | `change_me_postgres_password` | Local placeholder; do not commit real values. |
+| `POSTGRES_APP_USER` | dev compose | `app` | Runtime app role. |
+| `POSTGRES_APP_PASSWORD` | dev compose | `change_me_app_password` | Used to build local app connection strings. |
+| `POSTGRES_ADMIN_USER` | dev compose | `app_admin` | Migration/admin role. |
+| `POSTGRES_ADMIN_PASSWORD` | dev compose | `change_me_admin_password` | Used to build local admin connection strings. |
+| `DATABASE_URL` | yes | `postgres://app:***@db:5432/operational` | App-role Postgres connection. |
+| `DATABASE_ADMIN_URL` | yes | `postgres://app_admin:***@db:5432/operational` | Admin/migration Postgres connection. |
+| `REDIS_URL` | yes | `redis://redis:6379` | Redis for queues, cache, rate limits, and future sessions. |
+| `BULLMQ_QUEUE_PREFIX` | no | `brosolution` | Optional queue namespace. |
+| `EXPORT_DIR` | no | `/data/exports` | Filesystem export root used by reports/export jobs. |
+
+## API and web runtime
+
+| Key | Required | Example | Notes |
+|---|---:|---|---|
+| `API_PORT` | no | `4000` | API listen port; defaults to 4000. |
+| `CORS_ORIGINS` | yes | `http://localhost:3000,https://app.brosolution.id` | Comma-separated allowed web origins. |
+| `PUBLIC_APP_URL` | yes | `https://app.brosolution.id` | Public web URL used in emails and callbacks. |
+| `NEXT_PUBLIC_API_URL` | yes | `http://localhost:4000` | Browser-visible API base URL for Next.js. |
+
+## Auth and session hardening
+
+| Key | Required | Example | Notes |
+|---|---:|---|---|
+| `JWT_ACCESS_SECRET` | yes | 48-byte base64 string | Current access-token signing secret. |
+| `JWT_REFRESH_SECRET` | yes | 48-byte base64 string | Current refresh-token signing secret. |
+| `ACCESS_TOKEN_TTL` | no | `900` | Access-token TTL in seconds. |
+| `REFRESH_TOKEN_TTL` | no | `1209600` | Refresh-token TTL in seconds. |
+| `MFA_KMS_KEY` | P3 | 32-byte base64 string | Planned AES-GCM key for encrypted TOTP seeds. |
+| `SESSION_COOKIE_NAME` | P3 | `brosolution_session` | Planned HTTP-only session cookie name. |
+| `SESSION_COOKIE_DOMAIN` | P3/prod | `.brosolution.id` | Planned cookie domain; leave empty for localhost. |
+| `SESSION_COOKIE_SECURE` | P3/prod | `true` | Planned secure-cookie flag; true in production. |
+| `CSRF_COOKIE_NAME` | P3 | `brosolution_csrf` | Planned non-HTTP-only CSRF token cookie name for double-submit protection. |
+| `CSRF_HEADER_NAME` | P3 | `x-csrf-token` | Planned request header for state-changing requests. |
+
+P3 browser auth must move to HTTP-only secure cookie/server-side session semantics. Do not continue storing access or refresh tokens in `localStorage`; browser API calls should use `credentials: "include"` and CSRF protection on state-changing requests.
+
+## Email / SMTP
+
+| Key | Required | Example | Notes |
+|---|---:|---|---|
+| `SMTP_HOST` | yes | `mailpit` | Mailpit in dev; provider host in prod. |
+| `SMTP_PORT` | yes | `1025` | `587` or provider-specific port in prod. |
+| `SMTP_SECURE` | no | `false` | Set `true` for implicit TLS providers. |
+| `SMTP_USER` | prod | `postmaster@example` | Optional in local Mailpit. |
+| `SMTP_PASSWORD` | prod | `change_me_smtp_password` | Runtime name used by code; not `SMTP_PASS`. |
+| `SMTP_FROM` | yes | `BroSolution <no-reply@brosolution.id>` | Sender address for transactional email. |
+
+## Billing PSPs (P5)
+
+| Key | Required | Example | Notes |
+|---|---:|---|---|
+| `BILLING_ENABLED` | no | `false` | Feature flag; can ship billing dark before public enablement. |
+| `BILLING_ACTIVE_PSP` | P5 | `midtrans` or `xendit` | Admin-selected preferred PSP. Runtime must fall back to the other configured PSP when active PSP env/config is incomplete. |
+| `MIDTRANS_ENV` | if Midtrans configured | `sandbox` or `production` | Midtrans environment. |
+| `MIDTRANS_SERVER_KEY` | if Midtrans configured | `change_me_midtrans_server_key` | Server-side API and webhook signature verification. |
+| `MIDTRANS_CLIENT_KEY` | if Midtrans configured | `change_me_midtrans_client_key` | Snap client initialization. |
+| `MIDTRANS_MERCHANT_ID` | if Midtrans configured | `G123456789` | Merchant identifier. |
+| `XENDIT_ENV` | if Xendit configured | `sandbox` or `production` | Xendit environment. |
+| `XENDIT_SECRET_KEY` | if Xendit configured | `change_me_xendit_secret_key` | Server-side API key. |
+| `XENDIT_PUBLIC_KEY` | if Xendit configured | `change_me_xendit_public_key` | Client-side payment UI if needed. |
+| `XENDIT_WEBHOOK_TOKEN` | if Xendit configured | `change_me_xendit_webhook_token` | Webhook verification token. |
+
+Both Midtrans and Xendit must be supportable. A deployment may configure one or both providers, but billing runtime must validate provider readiness before selecting the active provider and must log fallback decisions.
+
+## Observability (P1)
+
+| Key | Required | Example | Notes |
+|---|---:|---|---|
+| `SENTRY_DSN` | prod | `https://example@sentry.brosolution.id/1` | API/worker Sentry DSN; empty disables Sentry initialization. |
+| `NEXT_PUBLIC_SENTRY_DSN` | prod web | `https://example@sentry.brosolution.id/2` | Browser-visible Sentry DSN for Next.js. |
+| `LOG_LEVEL` | no | `info` | `trace`, `debug`, `info`, `warn`, or `error`. |
+| `PROMETHEUS_METRICS_ENABLED` | P1 | `true` | Planned `/metrics` exposure flag. |
+| `LOKI_URL` | P1 | `http://loki:3100` | Planned log shipping target if app-side shipping is used. |
+
+## Backup (P8)
+
+| Key | Required | Example | Notes |
+|---|---:|---|---|
+| `BACKUP_S3_ENDPOINT` | prod/P8 | `https://s3.amazonaws.com` | S3-compatible endpoint (AWS S3, R2, Wasabi, Spaces). |
+| `BACKUP_S3_BUCKET` | prod/P8 | `brosolution-backups` | Backup bucket name. |
+| `BACKUP_S3_REGION` | prod/P8 | `ap-southeast-1` | Region or provider-specific placeholder. |
+| `BACKUP_S3_ACCESS_KEY` | prod/P8 | `change_me_backup_access_key` | Least-privilege write/read key for backup prefix. |
+| `BACKUP_S3_SECRET_KEY` | prod/P8 | `change_me_backup_secret_key` | Matching secret key. |
+| `BACKUP_S3_PREFIX` | no | `prod/` | Optional object prefix. |
+| `BACKUP_RETENTION_DAYS` | no | `30` | Planned retention policy for backup automation. |
+
+## E2E and CI helpers
+
+| Key | Required | Example | Notes |
+|---|---:|---|---|
+| `E2E_ADMIN_EMAIL` | e2e | `admin@local` | Playwright admin login. |
+| `E2E_ADMIN_PASSWORD` | e2e | `replace-me-admin-password` | Playwright admin password. |
+| `E2E_BASE_URL` | e2e | `http://localhost:3000` | Legacy/base E2E URL. |
+| `E2E_GROSIR_OWNER_PASSWORD` | e2e | `replace-me-owner-password` | Grosir owner password in seeded data. |
+| `E2E_GROSIR_SLUG` | e2e | `demo` | Tenant slug for Grosir E2E flows. |
+| `PLAYWRIGHT_BASE_URL` | e2e | `http://localhost:3000` | Playwright base URL; preferred by current config. |
