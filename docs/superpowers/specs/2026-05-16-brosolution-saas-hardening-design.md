@@ -230,6 +230,8 @@ i18n strategy: `next-intl`, message catalogs `messages/id.json` + `messages/en.j
 
 ### 8.3 Auth Hardening (P3)
 
+Detailed cookie/session migration design: `docs/auth-cookie-session-architecture.md`.
+
 - **Browser session model**: use HTTP-only secure cookies/server-side session semantics for browser auth. Do not store access or refresh tokens in `localStorage`; use `credentials: "include"`, CSRF protection on state-changing routes, and production cookie attributes `HttpOnly`, `Secure`, `SameSite=Lax` or stricter.
 - **Rate limit**: Redis token-bucket via `rate-limiter-flexible`. Buckets:
   - login: 5/min/IP, 10/min/email

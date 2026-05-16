@@ -1564,7 +1564,7 @@ git commit -m "test(e2e): marketing home page coverage"
 
 ## Phase P3 — Auth Hardening + MFA
 
-P3 must move browser auth to HTTP-only secure cookies / server-side session semantics. Do not continue storing access or refresh tokens in `localStorage`; web calls should use `credentials: "include"`, CSRF protection for state-changing requests, and cookie attributes `HttpOnly`, `Secure` in production, `SameSite=Lax` or stricter.
+P3 must move browser auth to HTTP-only secure cookies / server-side session semantics. Do not continue storing access or refresh tokens in `localStorage`; web calls should use `credentials: "include"`, CSRF protection for state-changing requests, and cookie attributes `HttpOnly`, `Secure` in production, `SameSite=Lax` or stricter. Detailed migration contract and PR split: `docs/auth-cookie-session-architecture.md`.
 
 ### Task P3.1: DB migration for MFA + token blacklist
 
