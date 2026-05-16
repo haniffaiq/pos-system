@@ -2,13 +2,14 @@ import type { Job } from "bullmq";
 
 import { MAIL_FROM, mailer } from "../../lib/mailer";
 import type { EmailJob } from "../queues";
+import { handleSignupVerify, isSignupVerifyEmailJob, renderSignupVerifyEmail } from "./signup-verify";
 
 type RenderedEmail = {
   subject: string;
   html: string;
 };
 
-type EmailProcessorJob = Pick<Job<EmailJob>, "data">;
+type EmailProcessorJob = Pick<Job<EmailJob>, "data" | "name">;
 
 function htmlEscape(value: string | undefined): string {
   return (value ?? "")
@@ -40,11 +41,13 @@ export function renderEmail(template: EmailJob["template"], vars: Record<string,
         subject: "Reset your password",
         html: `<p>Hi ${name}, use this link to reset: ${htmlEscape(vars.link)}</p>`,
       };
-    case "signup_verify":
-      return {
-        subject: "Verifikasi akun BroSolution kamu",
-        html: `<p>Terima kasih sudah mendaftar${vars.businessName ? ` untuk ${htmlEscape(vars.businessName)}` : ""}.</p><p>Klik link berikut untuk verifikasi akun kamu dalam 24 jam:</p><p><a href="${htmlEscape(vars.verifyUrl)}">${htmlEscape(vars.verifyUrl)}</a></p>`,
-      };
+    case "signup_verify": {
+      const signupJob: EmailJob = { to: "", template, vars };
+      if (!isSignupVerifyEmailJob(signupJob)) {
+        throw new Error("signup_verify emails require vars.verifyUrl");
+      }
+      return renderSignupVerifyEmail(signupJob);
+    }
     case "mfa_otp":
       return {
         subject: "Your verification code",
@@ -54,6 +57,11 @@ export function renderEmail(template: EmailJob["template"], vars: Record<string,
 }
 
 export async function emailProcessor(job: EmailProcessorJob): Promise<void> {
+  if (job.name === "signup-verify") {
+    await handleSignupVerify(job.data);
+    return;
+  }
+
   const { to, template, vars } = job.data;
   const { subject, html } = renderEmail(template, vars);
 

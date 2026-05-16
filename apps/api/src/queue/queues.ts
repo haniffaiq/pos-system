@@ -16,6 +16,14 @@ export interface EmailJob {
   vars: Record<string, string>;
 }
 
+export type SignupVerifyEmailJob = EmailJob & {
+  template: "signup_verify";
+  vars: Record<string, string> & {
+    verifyUrl: string;
+    businessName?: string;
+  };
+};
+
 export type LowStockScanJob = Record<string, never>;
 
 export interface ExportGenerationJob {
