@@ -1,5 +1,4 @@
 import { localeCookieName, isLocale } from "@/i18n";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 const oneYearInSeconds = 60 * 60 * 24 * 365;
@@ -19,11 +18,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_locale" }, { status: 400 });
   }
 
-  cookies().set(localeCookieName, requestedLocale, {
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(localeCookieName, requestedLocale, {
     path: "/",
     maxAge: oneYearInSeconds,
     sameSite: "lax",
   });
 
-  return NextResponse.json({ ok: true });
+  return response;
 }
