@@ -169,5 +169,39 @@
       "none": "tidak ada",
       "loading": "Memuat pengaturan PSP…"
     }
+  },
+  "signup": {
+    "back": "← Kembali ke beranda",
+    "title": "Mulai trial Pro 14 hari",
+    "subtitle": "Buat tenant BroSolution, verifikasi email, lalu langsung kelola operasional grosir.",
+    "benefits": {
+      "pro": "Semua fitur Pro aktif selama trial",
+      "noCard": "Tanpa kartu kredit saat daftar",
+      "verify": "Link verifikasi dikirim ke email owner"
+    },
+    "fields": {
+      "email": "Email kerja",
+      "password": "Password",
+      "businessName": "Nama bisnis",
+      "slug": "Slug tenant"
+    },
+    "slugHelp": "Dipakai untuk URL tenant, contoh: warung-maju.",
+    "submit": "Buat akun",
+    "loading": "Mendaftarkan…",
+    "success": "Cek email kamu untuk link verifikasi.",
+    "genericError": "Pendaftaran gagal. Periksa data lalu coba lagi.",
+    "networkError": "Tidak bisa menghubungi server. Coba lagi sebentar."
+  },
+  "verify": {
+    "verifyingTitle": "Memverifikasi akun…",
+    "verifyingBody": "Sebentar, kami menyiapkan tenant kamu.",
+    "successTitle": "Verifikasi berhasil",
+    "success": "Berhasil! Mengarahkan ke login tenant…",
+    "errorTitle": "Verifikasi gagal",
+    "missingToken": "Token verifikasi tidak ada.",
+    "invalidToken": "Token tidak valid atau sudah kedaluwarsa.",
+    "missingSlug": "Tenant berhasil diverifikasi tetapi slug tidak dikembalikan.",
+    "networkError": "Tidak bisa menghubungi server verifikasi. Coba lagi sebentar.",
+    "retry": "Kembali ke signup"
   }
 }
