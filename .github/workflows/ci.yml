@@ -154,6 +154,9 @@ jobs:
           cat /tmp/pos-web.log || true
           exit 1
 
+      - name: Run Playwright marketing home gate
+        run: pnpm --filter @app/e2e test:marketing
+
       - name: Run Playwright Phase 1 gate
         run: pnpm --filter @app/e2e test:phase1
 

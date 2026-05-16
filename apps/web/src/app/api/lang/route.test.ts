@@ -1,11 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { POST } from "./route";
-
-const setCookie = vi.fn();
-
-vi.mock("next/headers", () => ({
-  cookies: () => ({ set: setCookie }),
-}));
 
 function request(locale: unknown) {
   return new Request("http://localhost/api/lang", {
@@ -15,20 +9,15 @@ function request(locale: unknown) {
 }
 
 describe("POST /api/lang", () => {
-  beforeEach(() => {
-    setCookie.mockReset();
-  });
-
   it("persists supported locales in the lang cookie", async () => {
     const response = await POST(request("en"));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(setCookie).toHaveBeenCalledWith("lang", "en", {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax",
-    });
+    expect(response.headers.get("set-cookie")).toContain("lang=en");
+    expect(response.headers.get("set-cookie")).toContain("Path=/");
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=31536000");
+    expect(response.headers.get("set-cookie")).toContain("SameSite=lax");
   });
 
   it("rejects unsupported locales without setting a cookie", async () => {
@@ -36,7 +25,7 @@ describe("POST /api/lang", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "invalid_locale" });
-    expect(setCookie).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 
   it("rejects malformed JSON without setting a cookie", async () => {
@@ -49,6 +38,6 @@ describe("POST /api/lang", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "invalid_locale" });
-    expect(setCookie).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toBeNull();
   });
 });
