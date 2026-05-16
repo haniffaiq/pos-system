@@ -179,36 +179,63 @@ Detailed production automation lands in P8. Until then, use this deploy checklis
 
 ## Backup and restore
 
-Detailed backup automation lands in P8. The target is encrypted `pg_dump` output to S3-compatible object storage.
+Backups are custom-format `pg_dump` artifacts uploaded to S3-compatible object storage by `infra/backup/backup.sh`. Each artifact has a sibling `.sha256` checksum and the script prunes objects older than `BACKUP_RETENTION_DAYS` when retention is enabled.
+
+### Required backup environment
+
+- `DATABASE_URL`: source Postgres URL.
+- `BACKUP_S3_ENDPOINT`: S3-compatible endpoint, for example R2, Wasabi, DigitalOcean Spaces, or AWS S3.
+- `BACKUP_S3_BUCKET`: target bucket.
+- `BACKUP_S3_PREFIX`: optional prefix, defaults to bucket root; use `db` in production.
+- `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY`: optional aliases for AWS CLI credentials.
+- `BACKUP_S3_REGION`: optional, defaults to `auto`.
+- `BACKUP_RETENTION_DAYS`: optional retention window. Set `0` or unset to disable script-side pruning if bucket lifecycle policies own retention.
 
 ### Backup checklist
 
-1. Confirm `BACKUP_S3_*` variables are configured.
-2. Run backup from the production host or backup runner:
+1. Confirm `pg_dump`, `aws`, and `sha256sum` are installed on the backup runner.
+2. Confirm `BACKUP_S3_*`, `DATABASE_URL`, and `BACKUP_RETENTION_DAYS` are configured.
+3. Run backup from the production host or backup runner:
 
    ```bash
-   pg_dump "$DATABASE_URL" --format=custom --file "backup-$(date -u +%Y%m%dT%H%M%SZ).dump"
+   /opt/brosolution/infra/backup/backup.sh
    ```
 
-3. Upload to the configured S3-compatible bucket.
-4. Verify upload size, checksum, retention, and lifecycle policy.
-5. Emit or record backup success in the monitoring channel.
+4. Verify the output prints `backup ok: brosolution-db-<timestamp>.dump`.
+5. In object storage, verify both files exist under the configured prefix:
+   - `brosolution-db-<timestamp>.dump`
+   - `brosolution-db-<timestamp>.dump.sha256`
+6. Confirm old objects beyond `BACKUP_RETENTION_DAYS` were deleted, or that the bucket lifecycle policy enforces the required retention if script-side pruning is disabled.
+7. Emit or record backup success in the monitoring channel.
+
+### Cron schedule
+
+Install this on the VPS after replacing the user/path with the production values:
+
+```cron
+# /etc/cron.d/brosolution-backup
+0 2 * * * appuser /opt/brosolution/infra/backup/backup.sh >> /var/log/brosolution-backup.log 2>&1
+```
+
+Alert if the log does not contain a successful `backup ok:` line for the latest run or if the newest object is older than the recovery point objective.
 
 ### Restore dry-run checklist
 
 Run restore drills in staging or an isolated restore database only.
 
-1. Download the selected backup artifact.
-2. Create an empty restore database.
-3. Restore:
+1. Create an empty restore database and set `RESTORE_DATABASE_URL` to it. Do not point `RESTORE_DATABASE_URL` at production.
+2. Choose the backup key, for example `brosolution-db-20260516T020000Z.dump`.
+3. Restore and verify checksum automatically:
 
    ```bash
-   pg_restore --dbname "$RESTORE_DATABASE_URL" --clean --if-exists backup.dump
+   RESTORE_DATABASE_URL="postgres://app:***@staging-db:5432/restore_drill" \
+     /opt/brosolution/infra/backup/restore.sh brosolution-db-20260516T020000Z.dump
    ```
 
-4. Run migration status checks and app smoke tests against the restore database.
-5. Verify tenant isolation/RLS with at least two test tenants.
-6. Record recovery time and any manual fixes needed.
+4. The restore script downloads the `.dump` and `.dump.sha256`, runs `sha256sum --check`, restores with `pg_restore --clean --if-exists --no-owner --no-acl`, then runs `RESTORE_VERIFY_SQL` or `select 1;` by default.
+5. Run migration status checks and app smoke tests against the restore database.
+6. Verify tenant isolation/RLS with at least two test tenants.
+7. Record recovery time, selected backup key, checksum result, verification SQL result, and any manual fixes needed.
 
 ### Production restore guardrails
 
