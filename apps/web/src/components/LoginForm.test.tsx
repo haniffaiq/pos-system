@@ -65,10 +65,8 @@ describe("LoginForm", () => {
     consoleError.mockRestore();
   });
 
-  it("persists platform admin tokens and routes to admin shell", async () => {
+  it("stores safe platform admin metadata and routes to admin shell", async () => {
     mockedApiFetch.mockResolvedValueOnce({
-      accessToken: "admin-access",
-      refreshToken: "admin-refresh",
       admin: { id: "admin-1" },
     });
     render(<LoginForm mode="admin" />);
@@ -81,19 +79,12 @@ describe("LoginForm", () => {
         body: JSON.stringify({ email: "admin@example.com", password: "password123" }),
       });
     });
-    expect(mockedSetSession).toHaveBeenCalledWith({
-      accessToken: "admin-access",
-      refreshToken: "admin-refresh",
-      role: "platform_admin",
-      tenantId: null,
-    });
+    expect(mockedSetSession).toHaveBeenCalledWith({ role: "platform_admin", tenantId: null });
     expect(push).toHaveBeenCalledWith("/admin");
   });
 
-  it("persists tenant user tokens and routes to tenant shell", async () => {
+  it("stores safe tenant user metadata and routes to tenant shell", async () => {
     mockedApiFetch.mockResolvedValueOnce({
-      accessToken: "tenant-access",
-      refreshToken: "tenant-refresh",
       user: { role: "owner", tenantId: "tenant-1" },
     });
     render(<LoginForm mode="tenant" slug="warung-maju" />);
@@ -107,22 +98,36 @@ describe("LoginForm", () => {
       });
     });
     expect(mockedSetSession).toHaveBeenCalledWith({
-      accessToken: "tenant-access",
-      refreshToken: "tenant-refresh",
       role: "owner",
       tenantId: "tenant-1",
     });
     expect(push).toHaveBeenCalledWith("/t/warung-maju");
   });
 
-  it("renders a uniform bad credentials error without persisting tokens", async () => {
-    mockedApiFetch.mockRejectedValueOnce(new ApiError("invalid_credentials", "Invalid email or password", 401));
-    render(<LoginForm mode="admin" />);
+  it("renders and completes the MFA challenge before routing", async () => {
+    mockedApiFetch
+      .mockRejectedValueOnce(
+        new ApiError("MFA_REQUIRED", "Multi-factor authentication is required", 401, {
+          challengeToken: "challenge-1",
+          methods: ["totp", "email_otp"],
+        }),
+      )
+      .mockResolvedValueOnce({ user: { role: "owner", tenantId: "tenant-1" } });
+    render(<LoginForm mode="tenant" slug="warung-maju" />);
 
-    await submitLogin("wrong@example.com", "password123");
+    await submitLogin();
 
-    expect(await screen.findByText("Invalid email or password")).toBeTruthy();
-    expect(mockedSetSession).not.toHaveBeenCalled();
-    expect(push).not.toHaveBeenCalled();
+    expect(await screen.findByText("Multi-factor authentication")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("6-digit MFA code"), { target: { value: "654321" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verify code" }));
+
+    await waitFor(() =>
+      expect(mockedApiFetch).toHaveBeenLastCalledWith("/auth/mfa/challenge/verify", {
+        method: "POST",
+        body: JSON.stringify({ challengeToken: "challenge-1", method: "totp", code: "654321" }),
+      }),
+    );
+    expect(mockedSetSession).toHaveBeenCalledWith({ role: "owner", tenantId: "tenant-1" });
+    expect(push).toHaveBeenCalledWith("/t/warung-maju");
   });
 });

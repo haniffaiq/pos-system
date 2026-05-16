@@ -1,4 +1,4 @@
-import { clearSession, getSession, setSession } from "./auth";
+import { clearSession, getCsrfToken, getSession, setSession } from "./auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -42,13 +42,22 @@ async function readJson(response: Response): Promise<unknown> {
   return JSON.parse(text) as unknown;
 }
 
+function withCsrf(headers: Headers, method = "GET"): Headers {
+  if (!["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase()) && !headers.has("x-csrf-token")) {
+    const csrf = getCsrfToken();
+    if (csrf) headers.set("x-csrf-token", csrf);
+  }
+  return headers;
+}
+
 async function refreshTokens(): Promise<boolean> {
   const session = getSession();
   if (!session) return false;
 
+  const headers = withCsrf(new Headers({ "content-type": "application/json" }), "POST");
   const response = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers,
     credentials: "include",
   });
 
@@ -98,7 +107,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, retried 
   if (!headers.has("content-type")) {
     headers.set("content-type", "application/json");
   }
-  const response = await fetch(apiUrl(path), { ...init, headers, credentials: "include" });
+  const response = await fetch(apiUrl(path), { ...init, headers: withCsrf(headers, init.method), credentials: "include" });
 
   if (response.status === 401 && !retried && session && (await refreshTokens())) {
     return apiFetch<T>(path, init, true);

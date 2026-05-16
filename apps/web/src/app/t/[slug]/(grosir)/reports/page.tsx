@@ -42,13 +42,11 @@ function rangeQuery(from: string, to: string): string {
 
 async function downloadExport(job: ExportJob): Promise<void> {
   const session = getSession();
-  if (!session?.tenantId || !session.accessToken) throw new Error("no tenant session");
+  if (!session?.tenantId) throw new Error("no tenant session");
 
-  const headers = new Headers();
-  headers.set("authorization", `Bearer ${session.accessToken}`);
   const response = await fetch(
     `${API_BASE}/api/v1/t/${session.tenantId}/m/reports/exports/${job.id}/download`,
-    { headers },
+    { credentials: "include" },
   );
   if (!response.ok) throw new Error("download failed");
 

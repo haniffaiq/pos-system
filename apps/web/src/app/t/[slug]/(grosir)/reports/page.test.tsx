@@ -160,11 +160,9 @@ describe("grosir reports page", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "http://localhost:4000/api/v1/t/tenant-1/m/reports/exports/export-1/download",
-        expect.objectContaining({ headers: expect.any(Headers) }),
+        { credentials: "include" },
       );
     });
-    const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Headers;
-    expect(headers.get("authorization")).toBe("Bearer access-token");
     expect(createObjectURL).toHaveBeenCalledOnce();
     const downloadedBlob = createObjectURL.mock.calls[0]?.[0] as Blob;
     expect(downloadedBlob).toBeTruthy();
