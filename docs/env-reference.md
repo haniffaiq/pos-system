@@ -47,12 +47,16 @@ Avoid older/planned aliases such as `JWT_SECRET`, `ACCESS_TTL_SEC`, `REFRESH_TTL
 | `JWT_REFRESH_SECRET` | yes | 48-byte base64 string | Current refresh-token signing secret. |
 | `ACCESS_TOKEN_TTL` | no | `900` | Access-token TTL in seconds. |
 | `REFRESH_TOKEN_TTL` | no | `1209600` | Refresh-token TTL in seconds. |
-| `MFA_KMS_KEY` | P3 | 32-byte base64 string | Planned AES-GCM key for encrypted TOTP seeds. |
-| `SESSION_COOKIE_NAME` | P3 | `brosolution_session` | Planned HTTP-only session cookie name. |
-| `SESSION_COOKIE_DOMAIN` | P3/prod | `.brosolution.id` | Planned cookie domain; leave empty for localhost. |
-| `SESSION_COOKIE_SECURE` | P3/prod | `true` | Planned secure-cookie flag; true in production. |
-| `CSRF_COOKIE_NAME` | P3 | `brosolution_csrf` | Planned non-HTTP-only CSRF token cookie name for double-submit protection. |
-| `CSRF_HEADER_NAME` | P3 | `x-csrf-token` | Planned request header for state-changing requests. |
+| `MFA_KMS_KEY` | P3 | 32-byte base64 string | AES-GCM key for encrypted TOTP seeds. |
+| `SESSION_COOKIE_NAME` | no | `brosolution_session` | HTTP-only access/session cookie name; runtime default is `brs_access` if unset. |
+| `SESSION_COOKIE_DOMAIN` | prod | `.brosolution.id` | Cookie domain; leave empty for localhost. |
+| `SESSION_COOKIE_SECURE` | prod | `true` | Secure-cookie flag; true by default when `NODE_ENV=production`. |
+| `CSRF_COOKIE_NAME` | P3 | `brosolution_csrf` | Reserved non-HTTP-only CSRF token cookie name for double-submit protection; current runtime cookie is `brs_csrf`. |
+| `CSRF_HEADER_NAME` | P3 | `x-csrf-token` | Reserved request header for state-changing requests; current runtime header is `x-csrf-token`. |
+| `AUTH_MFA_BYPASS_EMAILS` | dev/test only | `owner@example.test` | Optional MFA bypass allow-list for tests and local development only; API startup refuses it when `NODE_ENV=production` or `APP_ENV=production`. Do not set in production. |
+| `MFA_CHALLENGE_RATE_LIMIT_POINTS` | no | `5` | Max MFA challenge send/verify attempts per challenge token and per user inside the rate-limit window. |
+| `MFA_CHALLENGE_RATE_LIMIT_SECONDS` | no | `60` | MFA challenge rate-limit window in seconds. |
+| `MFA_CHALLENGE_MAX_FAILURES` | no | `5` | Failed MFA verification attempts before the challenge is deleted/locked out. |
 
 P3 browser auth must move to HTTP-only secure cookie/server-side session semantics. Do not continue storing access or refresh tokens in `localStorage`; browser API calls should use `credentials: "include"` and CSRF protection on state-changing requests.
 

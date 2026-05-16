@@ -14,6 +14,7 @@ import {
 import { authRoutes } from "./auth.routes";
 
 vi.mock("../services/auth.service", () => ({
+  assertMfaBypassSafe: vi.fn(),
   loginTenantUser: vi.fn(),
   loginPlatformAdmin: vi.fn(),
   refresh: vi.fn(),
@@ -46,6 +47,7 @@ describe("auth routes", () => {
       type: "authenticated",
       accessToken: "access-token",
       refreshToken: "refresh-token",
+      csrfToken: "csrf-token",
       user: { id: "user-1", tenantId: "tenant-1", email: "u@routeco.test", name: "U", role: "manager" },
     });
 
@@ -110,7 +112,7 @@ describe("auth routes", () => {
     expect(denied.status).toBe(403);
     expect(refreshMock).not.toHaveBeenCalled();
 
-    refreshMock.mockResolvedValueOnce({ accessToken: "new-access", refreshToken: "new-refresh" });
+    refreshMock.mockResolvedValueOnce({ accessToken: "new-access", refreshToken: "new-refresh", csrfToken: "new-csrf" });
 
     const response = await testApp().request("/api/v1/auth/refresh", {
       method: "POST",
@@ -165,6 +167,7 @@ describe("auth routes", () => {
       type: "authenticated",
       accessToken: "access-after-mfa",
       refreshToken: "refresh-after-mfa",
+      csrfToken: "csrf-after-mfa",
       admin: { id: "admin-1", email: "admin@example.test", name: "Admin" },
     });
 

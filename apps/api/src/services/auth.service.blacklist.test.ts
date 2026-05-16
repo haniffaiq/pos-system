@@ -39,7 +39,7 @@ vi.mock("../db/withTenant", () => ({
 }));
 
 vi.mock("../lib/redis", () => ({
-  redis: { set: vi.fn(), get: vi.fn(), del: vi.fn() },
+  redis: { set: vi.fn(), get: vi.fn(), del: vi.fn(), incr: vi.fn(), expire: vi.fn(), ttl: vi.fn() },
 }));
 
 vi.mock("./email.service", () => ({

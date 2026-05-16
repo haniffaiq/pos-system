@@ -6,4 +6,5 @@ export interface JwtPayload {
   sub: string;
   tenantId: string | null;
   role: Role | "platform_admin";
+  sessionJti?: string;
 }

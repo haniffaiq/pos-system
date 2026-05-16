@@ -1,6 +1,7 @@
 import type { JwtPayload, Role } from "@app/shared";
 import { randomUUID } from "node:crypto";
 
+import { generateCsrfToken } from "../lib/cookies";
 import { withAdmin } from "../db/withTenant";
 import { AppError } from "../lib/errors";
 import { signAccess, signRefresh, verifyRefresh } from "../lib/jwt";
@@ -13,6 +14,9 @@ import { decryptStoredSecret, issueEmailOtp, verifyEmailOtp, verifyTotp } from "
 
 const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 1_209_600;
 const MFA_CHALLENGE_TTL_SECONDS = 300;
+const DEFAULT_MFA_CHALLENGE_MAX_FAILURES = 5;
+const DEFAULT_MFA_CHALLENGE_RATE_LIMIT_POINTS = 5;
+const DEFAULT_MFA_CHALLENGE_RATE_LIMIT_SECONDS = 60;
 
 type TenantUserLogin = {
   id: string;
@@ -48,6 +52,7 @@ type AuthenticatedResult = (TenantIdentity | AdminIdentity) & {
   type: "authenticated";
   accessToken: string;
   refreshToken: string;
+  csrfToken: string;
 };
 
 type MfaMethod = "totp" | "email_otp";
@@ -66,6 +71,7 @@ type ChallengeRecord = {
   email: string;
   methods: MfaMethod[];
   totpSecretEncrypted?: string;
+  failures?: number;
 };
 
 const challengeKey = (token: string) => `mfa:challenge:${token}`;
@@ -75,12 +81,57 @@ function refreshTtlSeconds(): number {
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_REFRESH_TOKEN_TTL_SECONDS;
 }
 
-async function issueTokens(payload: JwtPayload): Promise<{ accessToken: string; refreshToken: string }> {
-  const accessToken = await signAccess(payload);
-  const { token: refreshToken, jti } = await signRefresh(payload);
-  await saveRefresh(payload.sub, jti, refreshTtlSeconds());
+function positiveIntEnv(name: string, fallback: number): number {
+  const configured = Number(process.env[name] ?? fallback);
+  return Number.isInteger(configured) && configured > 0 ? configured : fallback;
+}
 
-  return { accessToken, refreshToken };
+function isProductionLike(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.APP_ENV === "production";
+}
+
+export function assertMfaBypassSafe(): void {
+  if (isProductionLike() && (process.env.AUTH_MFA_BYPASS_EMAILS ?? "").trim()) {
+    throw new Error("AUTH_MFA_BYPASS_EMAILS is test/development-only and must not be set in production");
+  }
+}
+
+async function consumeMfaChallengeRate(action: "send" | "verify", challengeToken: string, record: ChallengeRecord): Promise<void> {
+  const points = positiveIntEnv("MFA_CHALLENGE_RATE_LIMIT_POINTS", DEFAULT_MFA_CHALLENGE_RATE_LIMIT_POINTS);
+  const duration = positiveIntEnv("MFA_CHALLENGE_RATE_LIMIT_SECONDS", DEFAULT_MFA_CHALLENGE_RATE_LIMIT_SECONDS);
+  const keys = [
+    `mfa:challenge:rate:${action}:${challengeToken}`,
+    `mfa:user:rate:${action}:${record.payload.sub}`,
+  ];
+
+  for (const key of keys) {
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, duration);
+    if (count > points) {
+      throw new AppError(429, "rate_limited", "Too many MFA challenge attempts");
+    }
+  }
+}
+
+async function recordFailedMfaAttempt(key: string, record: ChallengeRecord): Promise<void> {
+  const failures = (record.failures ?? 0) + 1;
+  const maxFailures = positiveIntEnv("MFA_CHALLENGE_MAX_FAILURES", DEFAULT_MFA_CHALLENGE_MAX_FAILURES);
+  if (failures >= maxFailures) {
+    await redis.del(key);
+    return;
+  }
+
+  const ttl = await redis.ttl(key);
+  await redis.set(key, JSON.stringify({ ...record, failures }), "EX", ttl > 0 ? ttl : MFA_CHALLENGE_TTL_SECONDS);
+}
+
+async function issueTokens(payload: JwtPayload): Promise<{ accessToken: string; refreshToken: string; csrfToken: string }> {
+  const csrfToken = generateCsrfToken();
+  const { token: refreshToken, jti } = await signRefresh(payload);
+  const accessToken = await signAccess({ ...payload, sessionJti: jti });
+  await saveRefresh(payload.sub, jti, refreshTtlSeconds(), csrfToken);
+
+  return { accessToken, refreshToken, csrfToken };
 }
 
 async function authenticated(payload: JwtPayload, identity: TenantIdentity | AdminIdentity): Promise<AuthenticatedResult> {
@@ -109,6 +160,7 @@ function challengeMethods(totpEnabled: boolean): MfaMethod[] {
 }
 
 function hasMfaBypass(email: string): boolean {
+  assertMfaBypassSafe();
   return (process.env.AUTH_MFA_BYPASS_EMAILS ?? "")
     .split(",")
     .map((value) => value.trim().toLowerCase())
@@ -191,6 +243,7 @@ export async function loginPlatformAdmin(email: string, password: string): Promi
 
 export async function sendMfaChallengeEmail(challengeToken: string): Promise<void> {
   const record = parseChallenge(await redis.get(challengeKey(challengeToken)));
+  await consumeMfaChallengeRate("send", challengeToken, record);
   if (!record.methods.includes("email_otp")) {
     throw new AppError(400, "mfa_method_unavailable", "Email OTP is not available for this challenge");
   }
@@ -205,6 +258,7 @@ export async function verifyMfaChallenge(
 ): Promise<AuthenticatedResult> {
   const key = challengeKey(challengeToken);
   const record = parseChallenge(await redis.get(key));
+  await consumeMfaChallengeRate("verify", challengeToken, record);
   if (!record.methods.includes(method)) {
     throw new AppError(400, "mfa_method_unavailable", "MFA method is not available for this challenge");
   }
@@ -215,6 +269,7 @@ export async function verifyMfaChallenge(
       : Boolean(record.totpSecretEncrypted && verifyTotp(decryptStoredSecret(record.totpSecretEncrypted), code));
 
   if (!ok) {
+    await recordFailedMfaAttempt(key, record);
     throw new AppError(401, "invalid_mfa", "Invalid MFA code");
   }
 
@@ -222,7 +277,7 @@ export async function verifyMfaChallenge(
   return authenticated(record.payload, record.identity);
 }
 
-export async function refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+export async function refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; csrfToken: string }> {
   let decoded: JwtPayload & { jti: string; exp: number };
   try {
     decoded = await verifyRefresh(refreshToken);

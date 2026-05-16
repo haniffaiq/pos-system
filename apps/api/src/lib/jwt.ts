@@ -32,6 +32,7 @@ export async function signAccess(p: JwtPayload): Promise<string> {
     [TOKEN_TYPE_CLAIM]: ACCESS_TOKEN_TYPE,
     tenantId: p.tenantId,
     role: p.role,
+    sessionJti: p.sessionJti,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(p.sub)
@@ -68,6 +69,7 @@ export async function verifyAccess(token: string): Promise<JwtPayload> {
       sub: requireSubject(payload.sub, "access"),
       tenantId: readTenantId(payload.tenantId),
       role: readRole(payload.role),
+      sessionJti: readOptionalString(payload.sessionJti, "sessionJti"),
     };
   } catch (error) {
     throw wrapJwtError(error, "access");
@@ -122,6 +124,14 @@ function readRole(role: unknown): JwtPayload["role"] {
     throw new Error("invalid token role");
   }
   return role;
+}
+
+function readOptionalString(value: unknown, name: string): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`invalid token ${name}`);
+  }
+  return value;
 }
 
 function wrapJwtError(error: unknown, type: "access" | "refresh"): Error {

@@ -7,6 +7,7 @@ import { logger } from "./lib/logger";
 import { redis } from "./lib/redis";
 import { initSentry } from "./lib/sentry.js";
 import { onError } from "./middleware/error.js";
+import { csrfMiddleware } from "./middleware/csrf";
 import { metricsMiddleware, metricsRoute } from "./middleware/metrics";
 import { requestLogger } from "./middleware/requestLogger";
 import { adminRoutes } from "./routes/admin.routes";
@@ -40,6 +41,7 @@ app.use(
 app.onError(onError);
 app.use("*", requestLogger);
 app.use("*", metricsMiddleware);
+app.use("*", csrfMiddleware);
 app.route("/", metricsRoute);
 app.get("/health", (c) => c.json({ ok: true }));
 app.route(

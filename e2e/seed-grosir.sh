@@ -15,9 +15,16 @@ curl -fsS "$API_BASE_URL/api/v1/auth/admin-login" \
   -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" \
   >/dev/null
 
+csrf_token=$(awk '$6 == "brs_csrf" { print $7 }' "$cookie_jar" | tail -n 1)
+if [ -z "$csrf_token" ]; then
+  echo "missing CSRF cookie after admin login" >&2
+  exit 1
+fi
+
 curl -fsS "$API_BASE_URL/api/v1/admin/tenants" \
   -b "$cookie_jar" \
   -H 'content-type: application/json' \
+  -H "x-csrf-token: $csrf_token" \
   -d "{\"name\":\"E2E Grosir\",\"slug\":\"$SLUG\",\"sector\":\"grosir\",\"ownerEmail\":\"owner@$SLUG.com\",\"ownerPassword\":\"secret12\"}" \
   >/dev/null
 
