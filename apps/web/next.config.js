@@ -1,3 +1,4 @@
+const { withSentryConfig } = require("@sentry/nextjs");
 const createNextIntlPlugin = require("next-intl/plugin");
 
 const withNextIntl = createNextIntlPlugin("./src/i18n.ts");
@@ -8,4 +9,12 @@ const nextConfig = {
   output: "standalone",
 };
 
-module.exports = withNextIntl(nextConfig);
+module.exports = withSentryConfig(withNextIntl(nextConfig), {
+  silent: true,
+  hideSourceMaps: true,
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
+});

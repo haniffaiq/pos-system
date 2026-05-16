@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { adminPool } from "./db/pool";
 import { logger } from "./lib/logger";
 import { redis } from "./lib/redis";
+import { initSentry } from "./lib/sentry.js";
 import { onError } from "./middleware/error.js";
 import { adminRoutes } from "./routes/admin.routes";
 import { authRoutes } from "./routes/auth.routes";
@@ -12,6 +13,8 @@ import { healthRouter } from "./routes/health";
 import { signupRoutes } from "./routes/signup";
 import { tenantRoutes } from "./routes/tenant.routes";
 import "./modules/grosir";
+
+initSentry();
 
 const app = new Hono();
 
