@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
+
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { billingWebhookRouter, processXenditWebhook } from "./billing-webhook";
+import { billingWebhookRouter, processMidtransWebhook, processXenditWebhook } from "./billing-webhook";
 
 const mocks = vi.hoisted(() => ({
   withAdmin: vi.fn(),
@@ -28,6 +30,23 @@ function testApp() {
 
 function queryFromResponses(responses: unknown[][]) {
   return vi.fn(async () => ({ rows: responses.shift() ?? [], rowCount: 1 }));
+}
+
+function midtransPayload(overrides: Record<string, unknown> = {}, serverKey = "midtrans-server") {
+  const payload = {
+    order_id: "BILL-1",
+    status_code: "200",
+    gross_amount: "299000.00",
+    transaction_status: "settlement",
+    transaction_id: "midtrans-tx-1",
+    ...overrides,
+  };
+  return {
+    ...payload,
+    signature_key: createHash("sha512")
+      .update(`${payload.order_id}${payload.status_code}${payload.gross_amount}${serverKey}`)
+      .digest("hex"),
+  };
 }
 
 beforeEach(() => {
@@ -140,7 +159,130 @@ describe("processXenditWebhook", () => {
   });
 });
 
+describe("processMidtransWebhook", () => {
+  it("rejects bad Midtrans signatures before any database writes", async () => {
+    const q = vi.fn();
+
+    const out = await processMidtransWebhook(
+      { ...midtransPayload({}, "correct-server-key"), signature_key: "bad-signature" },
+      q as Query,
+      { serverKey: "correct-server-key" },
+    );
+
+    expect(out).toEqual({ ok: false, reason: "signature" });
+    expect(q).not.toHaveBeenCalled();
+  });
+
+  it("marks pending Midtrans invoices paid and activates subscriptions in the same transaction", async () => {
+    const q = queryFromResponses([
+      [
+        {
+          id: "invoice-1",
+          tenant_id: "tenant-1",
+          subscription_id: "subscription-1",
+          status: "pending",
+        },
+      ],
+      [],
+      [],
+    ]);
+
+    const out = await processMidtransWebhook(midtransPayload(), q as Query, { serverKey: "midtrans-server" });
+
+    expect(out).toEqual({ ok: true, reason: "updated", status: "paid" });
+    expect(q).toHaveBeenNthCalledWith(1, expect.stringContaining("psp_provider = 'midtrans'"), ["BILL-1"]);
+    expect(q).toHaveBeenNthCalledWith(2, expect.stringContaining("update invoices"), ["midtrans-tx-1", "BILL-1"]);
+    expect(q).toHaveBeenNthCalledWith(3, expect.stringContaining("update subscriptions"), ["subscription-1"]);
+  });
+
+  it("does not downgrade an already paid Midtrans invoice on a later failed webhook", async () => {
+    const q = queryFromResponses([
+      [
+        {
+          id: "invoice-1",
+          tenant_id: "tenant-1",
+          subscription_id: "subscription-1",
+          status: "paid",
+        },
+      ],
+    ]);
+
+    const out = await processMidtransWebhook(
+      midtransPayload({ transaction_status: "expire", transaction_id: "midtrans-tx-2" }),
+      q as Query,
+      { serverKey: "midtrans-server" },
+    );
+
+    expect(out).toEqual({ ok: true, reason: "already_paid", status: "paid" });
+    expect(q).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows failed Midtrans invoices to become paid on a later verified paid webhook", async () => {
+    const q = queryFromResponses([
+      [
+        {
+          id: "invoice-1",
+          tenant_id: "tenant-1",
+          subscription_id: "subscription-1",
+          status: "failed",
+        },
+      ],
+      [],
+      [],
+    ]);
+
+    const out = await processMidtransWebhook(midtransPayload({ transaction_status: "settlement" }), q as Query, { serverKey: "midtrans-server" });
+
+    expect(out).toEqual({ ok: true, reason: "updated", status: "paid" });
+    expect(q).toHaveBeenCalledTimes(3);
+  });
+
+  it("acknowledges unknown verified Midtrans orders without creating invoice rows", async () => {
+    const q = queryFromResponses([[]]);
+
+    const out = await processMidtransWebhook(midtransPayload({ order_id: "BILL-missing" }), q as Query, { serverKey: "midtrans-server" });
+
+    expect(out).toEqual({ ok: true, reason: "unknown_order" });
+    expect(q).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("billingWebhookRouter", () => {
+  it("returns non-200 for unverified Midtrans callbacks", async () => {
+    vi.stubEnv("MIDTRANS_ENV", "sandbox");
+    vi.stubEnv("MIDTRANS_SERVER_KEY", "midtrans-server");
+    vi.stubEnv("MIDTRANS_CLIENT_KEY", "midtrans-client");
+    vi.stubEnv("MIDTRANS_MERCHANT_ID", "midtrans-merchant");
+    withAdminMock.mockImplementationOnce((fn: (q: Query) => Promise<unknown>) => fn(vi.fn() as Query));
+
+    const response = await testApp().request("/api/v1/billing/midtrans/webhook", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...midtransPayload(), signature_key: "bad-signature" }),
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  it("returns 200 for verified unknown Midtrans orders to avoid retry storms", async () => {
+    vi.stubEnv("MIDTRANS_ENV", "sandbox");
+    vi.stubEnv("MIDTRANS_SERVER_KEY", "midtrans-server");
+    vi.stubEnv("MIDTRANS_CLIENT_KEY", "midtrans-client");
+    vi.stubEnv("MIDTRANS_MERCHANT_ID", "midtrans-merchant");
+    const q = queryFromResponses([[]]);
+    withAdminMock.mockImplementationOnce((fn: (q: Query) => Promise<unknown>) => fn(q as Query));
+
+    const response = await testApp().request("/api/v1/billing/midtrans/webhook", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(midtransPayload({ order_id: "BILL-missing" })),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true });
+    expect(mocks.loggerWarn).toHaveBeenCalledWith({ orderId: "BILL-missing", reason: "unknown_order" }, "midtrans webhook");
+  });
+
   it("returns non-200 for unverified Xendit callbacks", async () => {
     vi.stubEnv("XENDIT_WEBHOOK_TOKEN", "good-token");
     withAdminMock.mockImplementationOnce((fn: (q: Query) => Promise<unknown>) => fn(vi.fn() as Query));
