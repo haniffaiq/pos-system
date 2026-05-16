@@ -132,7 +132,7 @@ jobs:
           RATE_LIMIT_DISABLED: "true"
         run: |
           mkdir -p "$EXPORT_DIR"
-          pnpm --filter @app/api exec tsx src/index.ts > /tmp/pos-api.log 2>&1 &
+          AUTH_MFA_BYPASS_EMAILS='*' pnpm --filter @app/api exec tsx src/index.ts > /tmp/pos-api.log 2>&1 &
           pnpm --filter @app/api exec tsx src/worker.ts > /tmp/pos-worker.log 2>&1 &
           mkdir -p apps/web/.next/standalone/apps/web/.next/static
           cp -R apps/web/.next/static/. apps/web/.next/standalone/apps/web/.next/static/
@@ -171,6 +171,7 @@ jobs:
 
       - name: Restart API with billing gates enabled
         env:
+          AUTH_MFA_BYPASS_EMAILS: "*"
           BILLING_ENABLED: "true"
           RATE_LIMIT_DISABLED: "true"
         run: |

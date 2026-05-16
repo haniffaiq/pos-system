@@ -32,7 +32,7 @@ app.use(
   "/*",
   cors({
     origin: corsOrigins,
-    allowHeaders: ["content-type", "authorization"],
+    allowHeaders: ["content-type", "authorization", "x-csrf-token"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   }),

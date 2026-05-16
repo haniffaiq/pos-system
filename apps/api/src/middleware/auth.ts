@@ -1,9 +1,9 @@
 import type { JwtPayload } from "@app/shared";
 import type { MiddlewareHandler } from "hono";
-import { getCookie } from "hono/cookie";
 
 import { AppError } from "../lib/errors";
 import { verifyAccess } from "../lib/jwt";
+import { readAccessCookie } from "../lib/cookies";
 import { authSensitiveRateLimit, rateLimitMiddleware, requestIpKey } from "./rateLimit";
 
 const authSensitiveLimiter = rateLimitMiddleware(
@@ -19,9 +19,10 @@ declare module "hono" {
 
 export const authMiddleware: MiddlewareHandler = async (c, next) => {
   const header = c.req.header("authorization");
-  const token = header?.startsWith("Bearer ") ? header.slice(7) : getCookie(c, "owa.access");
+  const cookieToken = readAccessCookie(c);
+  const token = cookieToken ?? (header?.startsWith("Bearer ") ? header.slice(7) : undefined);
   if (!token) {
-    throw new AppError(401, "unauthorized", "Missing access token");
+    throw new AppError(401, "unauthorized", "Missing credentials");
   }
 
   try {

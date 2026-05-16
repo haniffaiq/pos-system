@@ -1,9 +1,9 @@
 import { loginSchema, type JwtPayload } from "@app/shared";
-import { Hono, type Context } from "hono";
-import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { Hono } from "hono";
 import { z } from "zod";
 
 import { withAdmin } from "../db/withTenant";
+import { clearAuthCookies, readCsrfCookie, readRefreshCookie, setAuthCookies } from "../lib/cookies";
 import { AppError } from "../lib/errors";
 import { authMiddleware } from "../middleware/auth";
 import {
@@ -14,51 +14,83 @@ import {
   refreshIpRateLimit,
   requestIpKey,
 } from "../middleware/rateLimit";
-import { loginPlatformAdmin, loginTenantUser, logout, refresh } from "../services/auth.service";
+import {
+  loginPlatformAdmin,
+  loginTenantUser,
+  logout,
+  refresh,
+  sendMfaChallengeEmail,
+  verifyMfaChallenge,
+  type LoginResult,
+} from "../services/auth.service";
 import { sendMfaEmail } from "../services/email.service";
 import { issueEmailOtp, verifyEmailOtp } from "../services/mfa.service";
 
 const tenantLoginSchema = loginSchema.extend({ slug: z.string().min(1) });
 const refreshSchema = z.object({ refreshToken: z.string().min(1) });
 const emailOtpSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
+const challengeTokenSchema = z.object({ challengeToken: z.string().min(1) });
+const challengeVerifySchema = challengeTokenSchema.extend({
+  method: z.enum(["totp", "email_otp"]),
+  code: z.string().regex(/^\d{6}$/),
+});
 const loginIpLimiter = rateLimitMiddleware(loginIpRateLimit, requestIpKey);
 const loginEmailLimiter = rateLimitByJsonBodyField(loginEmailRateLimit, "email");
 const refreshIpLimiter = rateLimitMiddleware(refreshIpRateLimit, requestIpKey);
-const isProduction = process.env.NODE_ENV === "production";
 
-function setAuthCookies(c: Context, tokens: { accessToken: string; refreshToken: string }) {
-  setCookie(c, "owa.access", tokens.accessToken, {
-    httpOnly: true,
-    sameSite: "Lax",
-    secure: isProduction,
-    path: "/",
-    maxAge: Number(process.env.ACCESS_TOKEN_TTL ?? 900),
-  });
-  setCookie(c, "owa.refresh", tokens.refreshToken, {
-    httpOnly: true,
-    sameSite: "Lax",
-    secure: isProduction,
-    path: "/api/v1/auth",
-    maxAge: Number(process.env.REFRESH_TOKEN_TTL ?? 60 * 60 * 24 * 30),
-  });
+async function refreshTokenFromRequest(c: Parameters<typeof readRefreshCookie>[0]): Promise<string> {
+  const refreshToken = await optionalRefreshTokenFromRequest(c);
+  if (!refreshToken) {
+    throw new AppError(400, "invalid_request", "Refresh token is required");
+  }
+  return refreshToken;
 }
 
-function clearAuthCookies(c: Context) {
-  deleteCookie(c, "owa.access", { path: "/" });
-  deleteCookie(c, "owa.refresh", { path: "/api/v1/auth" });
-}
-
-async function refreshTokenFromRequest(c: Context): Promise<string> {
-  const cookieToken = getCookie(c, "owa.refresh");
+async function optionalRefreshTokenFromRequest(c: Parameters<typeof readRefreshCookie>[0]): Promise<string | undefined> {
+  const cookieToken = readRefreshCookie(c);
   if (cookieToken) return cookieToken;
 
   let body: unknown = {};
   try {
     body = await c.req.json();
   } catch {
-    body = {};
+    return undefined;
   }
-  return refreshSchema.parse(body).refreshToken;
+  const parsed = refreshSchema.safeParse(body);
+  return parsed.success ? parsed.data.refreshToken : undefined;
+}
+
+function requireCsrfForCookieRefresh(c: Parameters<typeof readRefreshCookie>[0]): void {
+  if (!readRefreshCookie(c)) return;
+
+  const cookieToken = readCsrfCookie(c);
+  const headerToken = c.req.header("x-csrf-token");
+  if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+    throw new AppError(403, "csrf_invalid", "Invalid CSRF token");
+  }
+}
+
+function identityBody(result: LoginResult) {
+  if (result.type !== "authenticated") return {};
+  return "user" in result ? { user: result.user } : { admin: result.admin };
+}
+
+function authenticatedResponse(c: Parameters<typeof setAuthCookies>[0], result: LoginResult) {
+  if (result.type === "mfa_required") {
+    return c.json(
+      {
+        error: {
+          code: "MFA_REQUIRED",
+          message: "Multi-factor authentication is required",
+          details: { challengeToken: result.challengeToken, methods: result.methods },
+        },
+      },
+      401,
+    );
+  }
+
+  setAuthCookies(c, result);
+  return c.json(identityBody(result));
 }
 
 export const authRoutes = new Hono<{ Variables: { auth: JwtPayload } }>();
@@ -85,29 +117,42 @@ async function emailForMfa(auth: JwtPayload): Promise<string> {
 
 authRoutes.post("/tenant-login", loginIpLimiter, loginEmailLimiter, async (c) => {
   const { slug, email, password } = tenantLoginSchema.parse(await c.req.json());
-  const result = await loginTenantUser(slug, email, password);
-  setAuthCookies(c, result);
-  return c.json(result);
+  return authenticatedResponse(c, await loginTenantUser(slug, email, password));
 });
 
 authRoutes.post("/admin-login", loginIpLimiter, loginEmailLimiter, async (c) => {
   const { email, password } = loginSchema.parse(await c.req.json());
-  const result = await loginPlatformAdmin(email, password);
-  setAuthCookies(c, result);
-  return c.json(result);
+  return authenticatedResponse(c, await loginPlatformAdmin(email, password));
 });
 
 authRoutes.post("/refresh", refreshIpLimiter, async (c) => {
+  requireCsrfForCookieRefresh(c);
   const result = await refresh(await refreshTokenFromRequest(c));
   setAuthCookies(c, result);
-  return c.json(result);
+  return c.json({ ok: true });
 });
 
 authRoutes.post("/logout", async (c) => {
-  const refreshToken = await refreshTokenFromRequest(c);
-  await logout(refreshToken);
+  requireCsrfForCookieRefresh(c);
+  const refreshToken = await optionalRefreshTokenFromRequest(c);
+  if (refreshToken) {
+    await logout(refreshToken);
+  }
   clearAuthCookies(c);
   return c.json({ ok: true });
+});
+
+authRoutes.post("/mfa/challenge/send-email", async (c) => {
+  const { challengeToken } = challengeTokenSchema.parse(await c.req.json());
+  await sendMfaChallengeEmail(challengeToken);
+  return c.json({ sent: true });
+});
+
+authRoutes.post("/mfa/challenge/verify", async (c) => {
+  const { challengeToken, method, code } = challengeVerifySchema.parse(await c.req.json());
+  const result = await verifyMfaChallenge(challengeToken, method, code);
+  setAuthCookies(c, result);
+  return c.json(identityBody(result));
 });
 
 authRoutes.post("/mfa/email-otp/send", authMiddleware, async (c) => {
