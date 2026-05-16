@@ -95,8 +95,16 @@ Both Midtrans and Xendit must be supportable. A deployment may configure one or 
 | `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | no | `production` | Browser-visible Sentry environment tag; falls back to `NODE_ENV`. |
 | `NEXT_PUBLIC_SENTRY_RELEASE` | no | `web@2026.05.16` | Browser-visible Sentry release tag; falls back to `SENTRY_RELEASE`. |
 | `LOG_LEVEL` | no | `info` | `trace`, `debug`, `info`, `warn`, or `error`. |
-| `PROMETHEUS_METRICS_ENABLED` | P1 | `true` | Planned `/metrics` exposure flag. |
-| `LOKI_URL` | P1 | `http://loki:3100` | Planned log shipping target if app-side shipping is used. |
+| `PROMETHEUS_METRICS_ENABLED` | P1 | `true` | `/metrics` exposure flag for the API. |
+| `LOKI_URL` | P1 | `http://loki:3100` | Log shipping target if app-side shipping is added; Promtail currently tails Docker stdout. |
+| `GRAFANA_ADMIN_USER` | observability compose | `admin` | Initial Grafana admin user; rotate before any shared/prod deployment. |
+| `GRAFANA_ADMIN_PASSWORD` | observability compose | `change_me_grafana_password` | Initial Grafana admin password; must be set to a real secret outside git. |
+| `GRAFANA_BIND` | no | `127.0.0.1:3001` | Local-only Grafana bind by default; expose via Caddy/TLS in prod. |
+| `PROMETHEUS_BIND` | no | `127.0.0.1:9090` | Local-only Prometheus bind by default. |
+| `LOKI_BIND` | no | `127.0.0.1:3100` | Local-only Loki bind by default. |
+| `PROMETHEUS_RETENTION` | no | `30d` | Prometheus TSDB retention for the compose volume. |
+
+Run the observability stack with the app compose file so Prometheus can scrape `api:4000`: `docker compose -f docker-compose.yml -f docker-compose.observability.yml --profile observability up -d`. Dev defaults bind UIs to localhost; production should put Grafana/Prometheus behind Caddy/TLS instead of widening these binds.
 
 ## Backup (P8)
 
