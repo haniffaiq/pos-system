@@ -2,9 +2,12 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
+import { adminPool } from "./db/pool";
+import { redis } from "./lib/redis";
 import { onError } from "./middleware/error.js";
 import { adminRoutes } from "./routes/admin.routes";
 import { authRoutes } from "./routes/auth.routes";
+import { healthRouter } from "./routes/health";
 import { tenantRoutes } from "./routes/tenant.routes";
 import "./modules/grosir";
 
@@ -26,6 +29,21 @@ app.use(
 );
 app.onError(onError);
 app.get("/health", (c) => c.json({ ok: true }));
+app.route(
+  "/",
+  healthRouter({
+    postgresPing: async () =>
+      adminPool.query("select 1 as healthcheck").then(
+        () => true,
+        () => false,
+      ),
+    redisPing: async () =>
+      redis.ping().then(
+        () => true,
+        () => false,
+      ),
+  }),
+);
 
 app.route("/api/v1/auth", authRoutes);
 app.route("/api/v1/admin", adminRoutes);

@@ -1,17 +1,69 @@
 import { Hono } from "hono";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
+const mocks = vi.hoisted(() => ({
+  adminQuery: vi.fn(),
+  redisPing: vi.fn(),
+}));
+
+vi.mock("./db/pool", () => ({
+  adminPool: { query: mocks.adminQuery },
+  tenantPool: { query: vi.fn() },
+}));
+
+vi.mock("./lib/redis", () => ({
+  redis: { ping: mocks.redisPing },
+}));
 
 import { app } from "./index";
 import { AppError } from "./lib/errors";
 import { onError } from "./middleware/error";
 
 describe("api app skeleton", () => {
+  beforeEach(() => {
+    mocks.adminQuery.mockResolvedValue({ rows: [{ healthcheck: 1 }] });
+    mocks.redisPing.mockResolvedValue("PONG");
+  });
+
   it("responds to /health", async () => {
     const response = await app.request("/health");
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
+  });
+
+  it("responds to /healthz without checking dependencies", async () => {
+    const response = await app.request("/healthz");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "ok" });
+    expect(mocks.adminQuery).not.toHaveBeenCalled();
+    expect(mocks.redisPing).not.toHaveBeenCalled();
+  });
+
+  it("reports ready when Postgres and Redis checks pass", async () => {
+    const response = await app.request("/readyz");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      status: "ok",
+      checks: { postgres: "ok", redis: "ok" },
+    });
+    expect(mocks.adminQuery).toHaveBeenCalledWith("select 1 as healthcheck");
+    expect(mocks.redisPing).toHaveBeenCalledOnce();
+  });
+
+  it("reports not ready when any dependency check fails", async () => {
+    mocks.redisPing.mockRejectedValueOnce(new Error("connection refused"));
+
+    const response = await app.request("/readyz");
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      status: "error",
+      checks: { postgres: "ok", redis: "error" },
+    });
   });
 
   it("allows browser clients to call the API from the web origin", async () => {
