@@ -4,7 +4,9 @@ import { type JwtPayload } from "@app/shared";
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { enforceQuota } from "../../middleware/enforceQuota";
 import { requireRole } from "../../middleware/requireRole";
+import { incrementUsage } from "../../services/quota.service";
 import { getExportDownload, listExports, requestExport, salesReport, stockReport, type ReportRange } from "./reports.service";
 
 export const reportsRoutes = new Hono<{ Variables: { auth: JwtPayload } }>();
@@ -36,10 +38,12 @@ reportsRoutes.get("/stock", async (c) => {
 
 reportsRoutes.get("/exports", async (c) => c.json(await listExports(c.get("auth").tenantId!)));
 
-reportsRoutes.post("/exports", async (c) => {
+reportsRoutes.post("/exports", enforceQuota("exports"), async (c) => {
   const auth = c.get("auth");
   const body = exportRequestSchema.parse(await c.req.json());
-  return c.json(await requestExport(auth.tenantId!, auth.sub, body.type, body.params), 202);
+  const exportRequest = await requestExport(auth.tenantId!, auth.sub, body.type, body.params);
+  await incrementUsage(auth.tenantId!, "export_count");
+  return c.json(exportRequest, 202);
 });
 
 reportsRoutes.get("/exports/:id/download", async (c) => {

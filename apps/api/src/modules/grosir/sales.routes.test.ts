@@ -6,10 +6,20 @@ import { onError } from "../../middleware/error";
 import { createSale, listSales } from "./sales.service";
 import { salesRoutes } from "./sales.routes";
 
+const quotaMocks = vi.hoisted(() => ({
+  loadPlanForTenant: vi.fn(),
+  currentMonthlyUsage: vi.fn(),
+  countResource: vi.fn(),
+  incrementUsage: vi.fn(),
+  isOverQuota: vi.fn(),
+}));
+
 vi.mock("./sales.service", () => ({
   createSale: vi.fn(),
   listSales: vi.fn(),
 }));
+
+vi.mock("../../services/quota.service", () => quotaMocks);
 
 const tenantId = "00000000-0000-4000-8000-000000000001";
 const saleRow = {
@@ -34,7 +44,13 @@ function testApp(role: JwtPayload["role"] = "cashier") {
   return app;
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  process.env.PUBLIC_APP_URL = "https://app.example.test";
+  quotaMocks.loadPlanForTenant.mockResolvedValue({ status: "active", quota: { tx_per_month: 10 } });
+  quotaMocks.currentMonthlyUsage.mockResolvedValue(1);
+  quotaMocks.isOverQuota.mockImplementation((limit: number, current: number) => current >= limit && limit >= 0);
+});
 
 describe("sales routes", () => {
   it("allows cashiers to list and create sales", async () => {
@@ -61,6 +77,8 @@ describe("sales routes", () => {
     expect(await createResponse.json()).toEqual(saleRow);
     expect(listSales).toHaveBeenCalledWith(tenantId, { from: "2026-05-01", to: "2026-05-31" });
     expect(createSale).toHaveBeenCalledWith(tenantId, "user-1", input);
+    expect(quotaMocks.currentMonthlyUsage).toHaveBeenCalledWith(tenantId, "tx_count");
+    expect(quotaMocks.incrementUsage).toHaveBeenCalledWith(tenantId, "tx_count");
   });
 
   it("allows owners and managers to create sales too", async () => {
@@ -78,5 +96,36 @@ describe("sales routes", () => {
       expect(response.status).toBe(201);
     }
     expect(createSale).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects sale creation when the monthly transaction quota is exhausted", async () => {
+    quotaMocks.loadPlanForTenant.mockResolvedValueOnce({ status: "active", quota: { tx_per_month: 2 } });
+    quotaMocks.currentMonthlyUsage.mockResolvedValueOnce(2);
+
+    const response = await testApp("cashier").request("/sales", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        paymentMethod: "cash",
+        paid: 12000,
+        items: [{ productId: "prod-1", unitType: "eceran", qty: 1 }],
+      }),
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "QUOTA_EXCEEDED",
+        message: "Quota exceeded",
+        details: {
+          metric: "tx_per_month",
+          limit: 2,
+          current: 2,
+          upgrade_url: `https://app.example.test/t/${tenantId}/billing`,
+        },
+      },
+    });
+    expect(createSale).not.toHaveBeenCalled();
+    expect(quotaMocks.incrementUsage).not.toHaveBeenCalled();
   });
 });
