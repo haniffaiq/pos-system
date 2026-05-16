@@ -57,43 +57,52 @@ export async function getBillingSummary(tenantId: string): Promise<BillingSummar
   });
 }
 
-export async function createBillingCheckout(input: CheckoutInput): Promise<{ redirectUrl: string; provider: string }> {
-  const plan = await withAdmin(async (q) => {
-    const result = await q<PlanRow>("select id, code, name, price_idr, quota from plans where code = $1 and is_active = true", [
-      input.planCode,
-    ]);
-    return result.rows[0];
-  });
-  if (!plan) throw new AppError(404, "plan_not_found", "Plan is not available");
-
-  const amountIdr = Number(plan.price_idr);
-  if (amountIdr <= 0) throw new AppError(400, "invalid_plan", "Selected plan does not require checkout");
-
+export async function createBillingCheckout(input: CheckoutInput): Promise<{ redirectUrl: string; provider: string; orderId: string; token?: string }> {
   const resolution = resolvePaymentProvider();
   const orderId = `BILL-${input.tenantId.slice(0, 8)}-${randomUUID()}`;
   const dueAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-  await withAdmin(async (q) => {
+  return withAdmin(async (q) => {
+    const planResult = await q<PlanRow>("select id, code, name, price_idr, quota from plans where code = $1 and is_active = true", [
+      input.planCode,
+    ]);
+    const plan = planResult.rows[0];
+    if (!plan) throw new AppError(404, "plan_not_found", "Plan is not available");
+
+    const amountIdr = Number(plan.price_idr);
+    if (amountIdr <= 0) throw new AppError(400, "invalid_plan", "Selected plan does not require checkout");
+
     const subscription = await q<{ id: string }>(
-      `insert into subscriptions (tenant_id, plan_id, status, current_period_start, current_period_end)
-       values ($1, $2, 'trialing', now(), $3)
-       returning id`,
-      [input.tenantId, plan.id, periodEnd],
+      `select id
+         from subscriptions
+        where tenant_id = $1
+        order by created_at desc
+        limit 1`,
+      [input.tenantId],
     );
     await q(
       `insert into invoices (tenant_id, subscription_id, amount_idr, status, psp_provider, psp_order_id, due_at)
        values ($1, $2, $3, 'pending', $4, $5, $6)`,
-      [input.tenantId, subscription.rows[0]!.id, amountIdr, resolution.effectivePsp, orderId, dueAt],
+      [input.tenantId, subscription.rows[0]?.id ?? null, amountIdr, resolution.effectivePsp, orderId, dueAt],
     );
-  });
 
-  const checkout = await resolution.provider.createCheckout({
-    orderId,
-    amountIdr,
-    customerEmail: `${input.userId}@billing.local`,
-    description: `BroSolution ${plan.name} plan`,
-  });
+    try {
+      const checkout = await resolution.provider.createCheckout(
+        {
+          orderId,
+          amountIdr,
+          customerEmail: `${input.userId}@billing.local`,
+          description: `BroSolution ${plan.name} plan`,
+        },
+        process.env,
+      );
 
-  return { redirectUrl: checkout.redirectUrl, provider: checkout.provider };
+      return { provider: checkout.provider, orderId: checkout.orderId, redirectUrl: checkout.redirectUrl, token: checkout.token };
+    } catch (error) {
+      await q("update invoices set status = 'failed', updated_at = now() where psp_order_id = $1", [orderId]);
+      throw new AppError(503, "BILLING_PROVIDER_UNAVAILABLE", "Billing provider is temporarily unavailable", {
+        provider: resolution.effectivePsp,
+      });
+    }
+  });
 }
