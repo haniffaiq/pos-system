@@ -1,9 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 
+import { generateSecret, generateSync } from "otplib";
+
+import { encrypt } from "../lib/crypto";
 import { AppError } from "../lib/errors";
-import { createMfaOtpService } from "./mfa.service";
+import { createMfaOtpService, decryptStoredSecret, enrollTotp, generateCurrentTotp, verifyTotp } from "./mfa.service";
 
 type Entry = { value: string; expiresAt?: number };
+
+const KEY = Buffer.alloc(32, 1).toString("base64");
+
+beforeEach(() => {
+  process.env.MFA_KMS_KEY = KEY;
+});
 
 class FakeRedis {
   readonly entries = new Map<string, Entry>();
@@ -41,6 +50,45 @@ class FakeRedis {
     return 1;
   }
 }
+
+describe("mfa TOTP service", () => {
+  it("enrolls by encrypting the generated secret and returning a BroSolution otpauth URL", async () => {
+    let savedCipher = "";
+
+    const out = await enrollTotp({
+      label: "owner@example.com",
+      saveSecret: async (cipher) => {
+        savedCipher = cipher;
+      },
+    });
+
+    expect(out.secret).toBeTruthy();
+    expect(out.otpauth).toMatch(/^otpauth:\/\/totp\/BroSolution:owner%40example\.com/);
+    expect(savedCipher).toBeTruthy();
+    expect(savedCipher).not.toContain(out.secret);
+    expect(decryptStoredSecret(savedCipher)).toBe(out.secret);
+  });
+
+  it("accepts current TOTP codes, adjacent 30s steps, and rejects malformed or incorrect codes", () => {
+    const secret = generateSecret();
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const previousStepCode = generateSync({ secret, period: 30, epoch: nowSeconds - 30 });
+    const nextStepCode = generateSync({ secret, period: 30, epoch: nowSeconds + 30 });
+
+    expect(verifyTotp(secret, generateCurrentTotp(secret))).toBe(true);
+    expect(verifyTotp(secret, previousStepCode)).toBe(true);
+    expect(verifyTotp(secret, nextStepCode)).toBe(true);
+    expect(verifyTotp(secret, "000000")).toBe(false);
+    expect(verifyTotp(secret, "not-a-code")).toBe(false);
+  });
+
+  it("decrypts persisted MFA secrets with the configured MFA KMS key", () => {
+    const secret = generateSecret();
+    const cipher = encrypt(secret);
+
+    expect(decryptStoredSecret(cipher)).toBe(secret);
+  });
+});
 
 describe("mfa email OTP service", () => {
   it("issues a six digit OTP, stores only its hash with five minute expiry, and resets attempts", async () => {

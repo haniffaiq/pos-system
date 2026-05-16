@@ -65,7 +65,7 @@ export const decrypt = (payload: string, base64Key: string = getMfaKmsKey()): st
     const decipher = createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
-  } catch (error) {
-    throw new Error("Failed to decrypt MFA secret", { cause: error });
+  } catch {
+    throw new Error("Failed to decrypt MFA secret");
   }
 };

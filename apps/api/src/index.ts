@@ -14,6 +14,7 @@ import { authRoutes } from "./routes/auth.routes";
 import { billingRoutes } from "./routes/billing.routes";
 import { billingWebhookRouter } from "./routes/billing-webhook";
 import { healthRouter } from "./routes/health";
+import { mfaRouter } from "./routes/mfa";
 import { signupRoutes } from "./routes/signup";
 import { tenantRoutes } from "./routes/tenant.routes";
 import "./modules/grosir";
@@ -58,6 +59,7 @@ app.route(
 );
 
 app.route("/api/v1/auth", authRoutes);
+app.route("/api/v1/auth/mfa", mfaRouter);
 app.route("/api/v1/signup", signupRoutes);
 app.route("/api/v1/admin", adminRoutes);
 app.route("/api/v1/billing", billingWebhookRouter);
