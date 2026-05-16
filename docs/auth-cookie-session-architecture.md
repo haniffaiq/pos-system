@@ -68,8 +68,8 @@ Use a signed double-submit design:
 2. Set a readable `brs_csrf` cookie with the random value.
 3. Also include a signed/hash binding of the CSRF value to the refresh jti in the server-side refresh session record in Redis.
 4. Browser API helper reads `brs_csrf` and sends `x-csrf-token: <cookie value>` on state-changing requests.
-5. API CSRF middleware enforces header/cookie equality and server-side binding for unsafe methods: `POST`, `PUT`, `PATCH`, `DELETE`.
-6. Exempt only authentication bootstrap endpoints that do not yet have a session: `POST /auth/tenant-login`, `POST /auth/admin-login`, and MFA challenge verification. Do not exempt `/auth/refresh` or `/auth/logout` once cookies exist.
+5. API CSRF middleware enforces header/cookie equality and server-side binding to the refresh/session jti for unsafe methods: `POST`, `PUT`, `PATCH`, `DELETE`.
+6. Exempt only authentication bootstrap endpoints that do not yet have a session: `POST /auth/tenant-login`, `POST /auth/admin-login`, `POST /auth/mfa/challenge/send-email`, and `POST /auth/mfa/challenge/verify`. Do not exempt `/auth/refresh` or `/auth/logout` once cookies exist.
 
 Recommended middleware order for protected/state-changing routes:
 
@@ -81,7 +81,7 @@ Recommended middleware order for protected/state-changing routes:
 Response on CSRF failure:
 
 ```json
-{ "error": { "code": "CSRF_INVALID", "message": "Invalid CSRF token" } }
+{ "error": { "code": "csrf_invalid", "message": "Invalid CSRF token" } }
 ```
 
 Use HTTP 403.

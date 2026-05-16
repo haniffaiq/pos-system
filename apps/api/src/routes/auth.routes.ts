@@ -15,6 +15,7 @@ import {
   requestIpKey,
 } from "../middleware/rateLimit";
 import {
+  assertMfaBypassSafe,
   loginPlatformAdmin,
   loginTenantUser,
   logout,
@@ -37,6 +38,8 @@ const challengeVerifySchema = challengeTokenSchema.extend({
 const loginIpLimiter = rateLimitMiddleware(loginIpRateLimit, requestIpKey);
 const loginEmailLimiter = rateLimitByJsonBodyField(loginEmailRateLimit, "email");
 const refreshIpLimiter = rateLimitMiddleware(refreshIpRateLimit, requestIpKey);
+
+assertMfaBypassSafe();
 
 async function refreshTokenFromRequest(c: Parameters<typeof readRefreshCookie>[0]): Promise<string> {
   const refreshToken = await optionalRefreshTokenFromRequest(c);
