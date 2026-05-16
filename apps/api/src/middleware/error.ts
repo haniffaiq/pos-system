@@ -3,6 +3,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError } from "zod";
 
 import { AppError } from "../lib/errors.js";
+import { logger, toLogError } from "../lib/logger";
 
 export function onError(err: Error, c: Context): Response {
   if (err instanceof AppError) {
@@ -31,6 +32,6 @@ export function onError(err: Error, c: Context): Response {
     );
   }
 
-  console.error(err);
+  logger.error({ error: toLogError(err) }, "unhandled request error");
   return c.json({ error: { code: "internal_error", message: "Something went wrong" } }, 500);
 }

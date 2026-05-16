@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 import { adminPool } from "./db/pool";
+import { logger } from "./lib/logger";
 import { redis } from "./lib/redis";
 import { onError } from "./middleware/error.js";
 import { adminRoutes } from "./routes/admin.routes";
@@ -52,7 +53,7 @@ app.route("/api/v1/t", tenantRoutes);
 if (process.env.NODE_ENV !== "test") {
   const port = Number(process.env.API_PORT ?? 4000);
   serve({ fetch: app.fetch, port });
-  console.log(`api listening on ${port}`);
+  logger.info({ port }, "api listening");
 }
 
 export { app };
