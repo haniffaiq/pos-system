@@ -45,6 +45,11 @@ export function renderEmail(template: EmailJob["template"], vars: Record<string,
         subject: "Verifikasi akun BroSolution kamu",
         html: `<p>Terima kasih sudah mendaftar${vars.businessName ? ` untuk ${htmlEscape(vars.businessName)}` : ""}.</p><p>Klik link berikut untuk verifikasi akun kamu dalam 24 jam:</p><p><a href="${htmlEscape(vars.verifyUrl)}">${htmlEscape(vars.verifyUrl)}</a></p>`,
       };
+    case "mfa_otp":
+      return {
+        subject: "Your verification code",
+        html: `<p>Your verification code is <strong>${htmlEscape(vars.code)}</strong>. It expires in 5 minutes.</p>`,
+      };
   }
 }
 
