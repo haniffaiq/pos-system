@@ -2,6 +2,7 @@ import { Worker, type Job, type Processor, type WorkerOptions } from "bullmq";
 
 import { redis } from "./lib/redis";
 import { logger, toLogError } from "./lib/logger";
+import { recordQueueJob } from "./middleware/metrics";
 import { emailProcessor } from "./queue/jobs/email";
 import { exportProcessor } from "./queue/jobs/exportGeneration";
 import { lowStockProcessor } from "./queue/jobs/lowStockScan";
@@ -24,6 +25,14 @@ const workerOptions: WorkerOptions = {
 
 const exportGenerationProcessor: Processor<ExportGenerationJob> = exportProcessor;
 
+function jobDurationMs(job: Job | undefined): number {
+  if (!job?.processedOn) {
+    return 0;
+  }
+
+  return Math.max(0, (job.finishedOn ?? Date.now()) - job.processedOn);
+}
+
 function logFailedJob(queueName: string, job: Job | undefined, error: Error): void {
   logger.error({
     queueName,
@@ -35,7 +44,11 @@ function logFailedJob(queueName: string, job: Job | undefined, error: Error): vo
 
 function createWorker<JobData>(queueName: string, processor: Processor<JobData>): Worker<JobData> {
   const worker = new Worker<JobData>(queueName, processor, workerOptions);
-  worker.on("failed", (job, error) => logFailedJob(queueName, job, error));
+  worker.on("completed", (job) => recordQueueJob(queueName, "completed", jobDurationMs(job)));
+  worker.on("failed", (job, error) => {
+    recordQueueJob(queueName, "failed", jobDurationMs(job));
+    logFailedJob(queueName, job, error);
+  });
   return worker;
 }
 

@@ -11,6 +11,7 @@ const workerInstances = vi.hoisted(() => [] as Array<{
 const lowStockAdd = vi.hoisted(() => vi.fn());
 const logInfo = vi.hoisted(() => vi.fn());
 const logError = vi.hoisted(() => vi.fn());
+const recordQueueJob = vi.hoisted(() => vi.fn());
 
 vi.mock("bullmq", () => ({
   Worker: vi.fn().mockImplementation((name: string, processor: unknown, options: unknown) => {
@@ -40,6 +41,10 @@ vi.mock("./lib/logger", () => ({
   toLogError: (error: unknown) => (error instanceof Error ? { name: error.name } : { name: typeof error }),
 }));
 
+vi.mock("./middleware/metrics", () => ({
+  recordQueueJob,
+}));
+
 vi.mock("./queue/queues", () => ({
   QUEUE_NAMES: ["provisioning", "email", "low-stock-scan", "export-generation"],
   lowStockScanQueue: { add: lowStockAdd },
@@ -50,6 +55,7 @@ afterEach(() => {
   lowStockAdd.mockReset();
   logInfo.mockReset();
   logError.mockReset();
+  recordQueueJob.mockReset();
   vi.restoreAllMocks();
 });
 
@@ -66,13 +72,19 @@ describe("worker entrypoint", () => {
       "low-stock-scan",
       "export-generation",
     ]);
+    expect(workerInstances.every((worker) => worker.handlers.completed?.length === 1)).toBe(true);
     expect(workerInstances.every((worker) => worker.handlers.failed?.length === 1)).toBe(true);
 
+    await workerInstances[1].handlers.completed[0]({ processedOn: 1_000, finishedOn: 1_250 });
+
+    expect(recordQueueJob).toHaveBeenCalledWith("email", "completed", 250);
+
     await workerInstances[2].handlers.failed[0](
-      { id: "job-42", name: "scan", failedReason: "boom" },
+      { id: "job-42", name: "scan", failedReason: "boom", processedOn: 2_000, finishedOn: 2_100 },
       new Error("low stock failure"),
     );
 
+    expect(recordQueueJob).toHaveBeenCalledWith("low-stock-scan", "failed", 100);
     expect(logError).toHaveBeenCalledWith({
       queueName: "low-stock-scan",
       jobId: "job-42",
