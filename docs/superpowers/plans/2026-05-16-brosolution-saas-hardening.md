@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Convert operational-grosir from internal-tool grade into production SaaS under brand BroSolution: marketing landing, observability, hardened auth (MFA), self-serve signup, Midtrans billing, quota enforcement, frontend polish, and VPS deploy.
+**Goal:** Convert operational-grosir from internal-tool grade into production SaaS under brand BroSolution: marketing landing, observability, hardened auth (MFA), self-serve signup, Midtrans + Xendit billing, quota enforcement, frontend polish, and VPS deploy.
 
-**Architecture:** 9 phases, additive-only schema changes preserving existing multi-tenant RLS. Self-host observability + payment via Midtrans + VPS deploy. Brand i18n (ID/EN) with `next-intl`. Feature-flag billing rollout via `BILLING_ENABLED`.
+**Architecture:** 9 phases, additive-only schema changes preserving existing multi-tenant RLS. Self-host observability + payment via Midtrans and Xendit + VPS deploy. Brand i18n (ID/EN) with `next-intl`. Feature-flag billing rollout via `BILLING_ENABLED`; admins select `BILLING_ACTIVE_PSP`, and billing must fall back at runtime to the other configured PSP when the active PSP env/config is incomplete.
 
-**Tech Stack:** Hono (api), Next.js 14 (web), Postgres + Redis, BullMQ, Vitest + Playwright, Pino + Loki + Grafana, Sentry self-host, Midtrans Snap, Caddy + Docker Compose.
+**Tech Stack:** Hono (api), Next.js 14 (web), Postgres + Redis, BullMQ, Vitest + Playwright, Pino + Loki + Grafana, Sentry self-host, Midtrans Snap, Xendit Invoices/Payment Links, Caddy + Docker Compose.
 
 **Spec:** `docs/superpowers/specs/2026-05-16-brosolution-saas-hardening-design.md`
 
@@ -14,49 +14,47 @@
 
 ## Phase P0 — Secrets + Docs Foundation
 
-### Task P0.1: Remove `.env` from tracking + rotate
+### Task P0.1: Verify `.env` tracking + document history audit
 
 **Files:**
 - Modify: `.gitignore`
 - Modify: `.env.example`
-- Delete (from index, keep local): `.env`
+- Create: `docs/security-secrets-audit.md`
 
-- [ ] **Step 1: Verify `.env` is tracked**
+- [ ] **Step 1: Verify `.env` is not tracked**
 
-Run: `git ls-files .env`
-Expected: prints `.env`
+Run: `git ls-files '.env' '.env.*' ':!:*.example'`
+Expected: no output. If a real `.env` path appears, stop and remove it from the index with `git rm --cached <path>` without deleting the local file.
 
-- [ ] **Step 2: Remove from index without deleting local file**
+- [ ] **Step 2: Verify ignore coverage**
 
-Run: `git rm --cached .env`
-Expected: `rm '.env'`
+`.gitignore` must ignore `.env` and `.env.*` while explicitly allowing `!.env.example`.
 
-- [ ] **Step 3: Add `.env` patterns to `.gitignore`**
+- [ ] **Step 3: Inspect reachable history for accidental `.env` commits**
 
-Append to `.gitignore`:
+Run:
+```bash
+git log --oneline --all -- .env
+git log --all --name-only --pretty=format: | grep -E '(^|/)\.env(\.|$)' || true
 ```
-.env
-.env.local
-.env.*.local
-!.env.example
-```
+Expected: no real `.env` path; `.env.example` is acceptable. Do not paste secret values into the audit output.
 
-- [ ] **Step 4: Verify `.env.example` has every key**
+- [ ] **Step 4: Verify `.env.example` has placeholders for current and planned keys**
 
-Open both files side-by-side. For each key in local `.env`, ensure `.env.example` has the same key with placeholder value (e.g. `JWT_SECRET=replace-me-min-32-chars`).
+Required current keys: `DATABASE_URL`, `DATABASE_ADMIN_URL`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL`, `CORS_ORIGINS`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `PUBLIC_APP_URL`, `NEXT_PUBLIC_API_URL`.
 
-Required keys: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `ACCESS_TTL_SEC`, `REFRESH_TTL_SEC`, `CORS_ORIGINS`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `MFA_KMS_KEY`, `MIDTRANS_ENV`, `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY`, `MIDTRANS_MERCHANT_ID`, `SENTRY_DSN`, `BILLING_ENABLED`, `PUBLIC_APP_URL`, `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY`.
+Required planned keys: `MFA_KMS_KEY`, `SESSION_COOKIE_NAME`, `SESSION_COOKIE_DOMAIN`, `SESSION_COOKIE_SECURE`, `BILLING_ENABLED`, `BILLING_ACTIVE_PSP`, `MIDTRANS_ENV`, `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY`, `MIDTRANS_MERCHANT_ID`, `XENDIT_ENV`, `XENDIT_SECRET_KEY`, `XENDIT_PUBLIC_KEY`, `XENDIT_WEBHOOK_TOKEN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY`.
 
-- [ ] **Step 5: Commit removal**
+- [ ] **Step 5: Document audit + rotation guidance**
+
+Create `docs/security-secrets-audit.md` with command results, path/key-only history findings, and rotation guidance. If no `.env` blob exists in reachable history, state that no repository-history leak was identified; still document rotation steps for any credentials that may have leaked outside git.
+
+- [ ] **Step 6: Commit audit corrections**
 
 ```bash
-git add .gitignore .env.example
-git commit -m "chore: untrack .env, expand .env.example with all required keys"
+git add .gitignore .env.example docs/security-secrets-audit.md docs/superpowers/plans/2026-05-16-brosolution-saas-hardening.md docs/superpowers/specs/2026-05-16-brosolution-saas-hardening-design.md
+git commit -m "docs: audit env tracking and secret handling"
 ```
-
-- [ ] **Step 6: Rotate all secrets locally (manual, document in runbook P0.4)**
-
-Generate new values locally with `openssl rand -base64 48` for `JWT_SECRET`, `JWT_REFRESH_SECRET`, `MFA_KMS_KEY`. Update local `.env`. Note: production secrets handled in P8.
 
 ### Task P0.2: Root README
 
@@ -156,14 +154,19 @@ All vars are read from `.env` in dev; injected via deploy environment in prod.
 | `SMTP_PASS` | prod | | |
 | `SMTP_FROM` | yes | `BroSolution <no-reply@brosolution.id>` | |
 
-## Midtrans (from P5)
+## Billing PSPs (from P5)
 | Key | Required | Example | Notes |
 |---|---|---|---|
-| `MIDTRANS_ENV` | yes | `sandbox` / `production` | |
-| `MIDTRANS_SERVER_KEY` | yes | | Server-side ops |
-| `MIDTRANS_CLIENT_KEY` | yes | | Snap client init |
-| `MIDTRANS_MERCHANT_ID` | yes | | |
 | `BILLING_ENABLED` | no | `true` / `false` | Feature flag |
+| `BILLING_ACTIVE_PSP` | yes | `midtrans` / `xendit` | Admin-selected default; runtime fallback to the other configured PSP is required when active PSP config is incomplete |
+| `MIDTRANS_ENV` | yes if Midtrans configured | `sandbox` / `production` | |
+| `MIDTRANS_SERVER_KEY` | yes if Midtrans configured | | Server-side ops |
+| `MIDTRANS_CLIENT_KEY` | yes if Midtrans configured | | Snap client init |
+| `MIDTRANS_MERCHANT_ID` | yes if Midtrans configured | | |
+| `XENDIT_ENV` | yes if Xendit configured | `sandbox` / `production` | |
+| `XENDIT_SECRET_KEY` | yes if Xendit configured | | Server-side ops |
+| `XENDIT_PUBLIC_KEY` | yes if Xendit configured | | Client-side payment UI if needed |
+| `XENDIT_WEBHOOK_TOKEN` | yes if Xendit configured | | Webhook verification |
 
 ## Observability (from P1)
 | Key | Required | Example | Notes |
@@ -1559,7 +1562,9 @@ git commit -m "test(e2e): marketing home page coverage"
 
 ---
 
-## Phase P3 — Auth Hardening
+## Phase P3 — Auth Hardening + MFA
+
+P3 must move browser auth to HTTP-only secure cookies / server-side session semantics. Do not continue storing access or refresh tokens in `localStorage`; web calls should use `credentials: "include"`, CSRF protection for state-changing requests, and cookie attributes `HttpOnly`, `Secure` in production, `SameSite=Lax` or stricter.
 
 ### Task P3.1: DB migration for MFA + token blacklist
 
@@ -2570,7 +2575,9 @@ git commit -m "test(e2e): signup → verify → login flow"
 
 ---
 
-## Phase P5 — Billing Core (Midtrans)
+## Phase P5 — Billing Core (Midtrans + Xendit)
+
+P5 acceptance requirement: billing must support both Midtrans and Xendit behind a provider abstraction. Admin config selects the active PSP (`BILLING_ACTIVE_PSP`), and runtime checkout/reconcile/webhook code must fall back to the other configured provider when the selected provider env/config is incomplete. Prefer generic DB names (`psp_provider`, `psp_order_id`, `psp_transaction_id`, `psp_subscription_id`) rather than Midtrans-only column names.
 
 ### Task P5.1: Plans + subscriptions + invoices schema + seed
 
@@ -2602,7 +2609,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   current_period_start timestamptz NOT NULL DEFAULT now(),
   current_period_end timestamptz NOT NULL,
   cancel_at_period_end boolean NOT NULL DEFAULT false,
-  midtrans_subscription_id text,
+  psp_provider text,
+  psp_subscription_id text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
@@ -2618,8 +2626,9 @@ CREATE TABLE IF NOT EXISTS invoices (
   subscription_id uuid NOT NULL REFERENCES subscriptions(id),
   amount_idr int NOT NULL,
   status text NOT NULL CHECK (status IN ('pending','paid','failed','expired','refunded')),
-  midtrans_order_id text UNIQUE NOT NULL,
-  midtrans_transaction_id text,
+  psp_provider text NOT NULL,
+  psp_order_id text UNIQUE NOT NULL,
+  psp_transaction_id text,
   payment_method text,
   due_at timestamptz NOT NULL,
   paid_at timestamptz,
@@ -2707,13 +2716,15 @@ git add db/migrations/006_billing.sql db/seeds/seed-plans.ts package.json
 git commit -m "feat(db): plans, subscriptions, invoices, usage_counters + seed"
 ```
 
-### Task P5.2: Midtrans client wrapper
+### Task P5.2: Payment provider client wrappers (Midtrans + Xendit)
 
 **Files:**
-- Create: `apps/api/src/lib/midtrans.ts`
-- Create: `apps/api/src/lib/midtrans.test.ts`
+- Create: `apps/api/src/lib/payments/midtrans.ts`
+- Create: `apps/api/src/lib/payments/xendit.ts`
+- Create: `apps/api/src/lib/payments/provider.ts`
+- Create: `apps/api/src/lib/payments/provider.test.ts`
 
-- [ ] **Step 1: Test signature verification**
+- [ ] **Step 1: Test provider selection, fallback, and signature verification**
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -2737,6 +2748,10 @@ describe("midtrans signature", () => {
 
 ```ts
 import { createHash } from "node:crypto";
+
+// Midtrans helpers live in `payments/midtrans.ts`; Xendit helpers live in `payments/xendit.ts`.
+// `payments/provider.ts` selects `process.env.BILLING_ACTIVE_PSP` and must fall back
+// to the other configured PSP when the active provider env/config is incomplete.
 
 const BASE = () => process.env.MIDTRANS_ENV === "production"
   ? "https://api.midtrans.com"
@@ -2826,7 +2841,7 @@ export const createCheckout = async (tenantId: string, targetPlanCode: "pro" | "
 
 - [ ] **Step 2: Route**
 
-`apps/api/src/routes/billing.ts`:
+`apps/api/src/routes/billing.ts` (through the generic payment provider abstraction, not a Midtrans-only helper):
 ```ts
 import { Hono } from "hono";
 import { z } from "zod";

@@ -29,7 +29,7 @@
 |---|---|
 | Brand | **BroSolution** (company); `Operational Grosir` retained as product line |
 | Languages | Indonesian + English with toggle (i18n) |
-| Payment gateway | **Midtrans** (Snap + recurring subscription API) |
+| Payment gateways | **Midtrans + Xendit**, with admin-selected active PSP and runtime fallback to the other configured provider when the active provider env/config is incomplete |
 | Plan tiers | Free / Pro / Business (3 tiers) |
 | Deploy target | **VPS + Docker Compose + Caddy** (single-region) |
 | Marketing sections | Hero, logo bar/social proof, features, screenshot, pricing, FAQ, footer (skip testimonials v1) |
@@ -68,7 +68,7 @@
               [worker (BullMQ)]   [Postgres] [Redis]
                     │
                     ↓
-             [Midtrans, SMTP, Loki, Sentry]
+             [Midtrans, Xendit, SMTP, Loki, Sentry]
 ```
 
 All services run via `docker-compose` with `prod` profile on a single VPS in v1. Stateful services (Postgres, Redis) persist to host volumes. Observability stack (Loki, Grafana, Prometheus, Sentry) runs in a sibling compose project.
@@ -82,7 +82,7 @@ All services run via `docker-compose` with `prod` profile on a single VPS in v1.
 | P2 | Marketing home + i18n | Landing page (hero/features/screenshot/pricing/FAQ/footer), `next-intl` ID/EN toggle, login dropdown nav | P0 |
 | P3 | Auth hardening | Login + signup + refresh rate limits, TOTP enrollment + verify, Email OTP fallback, refresh-token blacklist | P1 |
 | P4 | Self-serve signup | `/signup` form, email verification, transactional tenant bootstrap, auto-trial Pro 14 days | P2, P3 |
-| P5 | Billing core | Plans/Subscriptions/Invoices schema, Midtrans Snap checkout, webhook handler, recurring (card auto-charge + VA reminder), idempotent handlers | P4 |
+| P5 | Billing core | Plans/Subscriptions/Invoices schema, Midtrans + Xendit checkout, webhook handlers, recurring/reminder flows, admin-selected active PSP with runtime fallback, idempotent handlers | P4 |
 | P6 | Quota enforcement + dunning | `enforceQuota` middleware, usage counter rollup, UI gating + upgrade CTA, suspend-on-dunning | P5 |
 | P7 | Frontend polish | Error boundaries per route, `axe-core` a11y pass, full i18n key coverage, responsive viewports CI gate | P2 |
 | P8 | DevOps production | `docker-compose.prod.yml`, Caddy reverse proxy, `pg_dump` → S3-compatible backup, staging environment, CI deploy job | All prior |
@@ -111,7 +111,8 @@ subscriptions (
   current_period_start timestamptz,
   current_period_end timestamptz,
   cancel_at_period_end boolean,
-  midtrans_subscription_id text nullable,
+  psp_provider text nullable,         -- midtrans | xendit
+  psp_subscription_id text nullable,
   created_at timestamptz,
   updated_at timestamptz
 );
@@ -122,8 +123,9 @@ invoices (
   subscription_id uuid fk,
   amount_idr int,
   status text,                -- 'pending' | 'paid' | 'failed' | 'expired' | 'refunded'
-  midtrans_order_id text unique,
-  midtrans_transaction_id text nullable,
+  psp_provider text,                  -- midtrans | xendit
+  psp_order_id text unique,
+  psp_transaction_id text nullable,
   payment_method text nullable,
   due_at timestamptz,
   paid_at timestamptz nullable,
@@ -228,6 +230,7 @@ i18n strategy: `next-intl`, message catalogs `messages/id.json` + `messages/en.j
 
 ### 8.3 Auth Hardening (P3)
 
+- **Browser session model**: use HTTP-only secure cookies/server-side session semantics for browser auth. Do not store access or refresh tokens in `localStorage`; use `credentials: "include"`, CSRF protection on state-changing routes, and production cookie attributes `HttpOnly`, `Secure`, `SameSite=Lax` or stricter.
 - **Rate limit**: Redis token-bucket via `rate-limiter-flexible`. Buckets:
   - login: 5/min/IP, 10/min/email
   - signup: 3/hour/IP
@@ -241,9 +244,9 @@ i18n strategy: `next-intl`, message catalogs `messages/id.json` + `messages/en.j
   - On success, issue access + refresh tokens.
 - **Revocation**: `POST /auth/logout` writes `jti` to `refresh_token_blacklist`. Refresh handler checks blacklist before issuing new tokens. Cron purges expired rows daily.
 
-### 8.4 Midtrans Integration (P5)
+### 8.4 Payment Provider Integration (P5)
 
-- **Mode**: Snap (drop-in checkout) for first payment + plan changes; recurring via Midtrans Subscription API for card auto-charge; VA/QRIS = per-period invoice + reminder workflow.
+- **Mode**: Admin selects active PSP with `BILLING_ACTIVE_PSP=midtrans|xendit`. Billing runtime uses the active PSP when configured; if its required env/config is incomplete, it falls back to the other configured PSP and logs the fallback. Midtrans uses Snap for first payment + plan changes and Subscription API where available. Xendit uses invoices/payment links and recurring/reminder workflows where available.
 - **Endpoints called**:
   - `POST /snap/v1/transactions`
   - `POST /v1/subscriptions`
@@ -252,7 +255,7 @@ i18n strategy: `next-intl`, message catalogs `messages/id.json` + `messages/en.j
   - Verify `signature_key = SHA512(order_id + status_code + gross_amount + server_key)`
   - Idempotent: `INSERT INTO invoices … ON CONFLICT (midtrans_order_id) DO UPDATE` on relevant fields only
   - Always return 200 after signature verify; log failure to Sentry; internal retry via queue
-- **Env**: `MIDTRANS_ENV=sandbox|production`, `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY`, `MIDTRANS_MERCHANT_ID`
+- **Env**: `BILLING_ACTIVE_PSP=midtrans|xendit`, `MIDTRANS_ENV=sandbox|production`, `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY`, `MIDTRANS_MERCHANT_ID`, `XENDIT_ENV=sandbox|production`, `XENDIT_SECRET_KEY`, `XENDIT_PUBLIC_KEY`, `XENDIT_WEBHOOK_TOKEN`
 - **Reconciliation cron**: hourly job queries Midtrans for `invoices.status='pending'` older than 10 min; updates accordingly
 
 ### 8.5 Quota Enforcement (P6)
@@ -283,7 +286,7 @@ i18n strategy: `next-intl`, message catalogs `messages/id.json` + `messages/en.j
 ## 9. External Interfaces
 
 - **Email** (signup verify, MFA OTP, billing reminders, dunning): SMTP via existing `nodemailer`. Provider TBD by user; defaults to Mailpit in dev.
-- **Midtrans**: per 8.4.
+- **Midtrans + Xendit**: per 8.4.
 - **Object storage** (P8 backup target): S3-compatible (Cloudflare R2, Wasabi, or DigitalOcean Spaces). `BACKUP_S3_*` envs.
 
 ## 10. Error Handling
@@ -325,7 +328,7 @@ i18n strategy: `next-intl`, message catalogs `messages/id.json` + `messages/en.j
 | Webhook missed → invoice stuck `pending` | Med | High | Hourly reconcile cron queries Midtrans for pending |
 | Self-host Sentry/Loki ops burden | High | Med | Single compose profile; 30d retention; email alerts |
 | Quota race on concurrent insert near limit | Med | Med | DB constraint + pessimistic lock when usage > 90% |
-| `.env` already in git history | Realized | High | Rotate all secrets in P0; optional `git filter-repo` cleanup |
+| `.env` accidentally committed in git history | Unknown until P0 audit | High | Audit current tracking and reachable history in P0; if leaked, rotate all secrets and consider `git filter-repo` cleanup |
 | MFA seed plaintext if key leaks | Low | High | Key from env not DB; rotation procedure in runbook |
 | Trial abuse via repeat signup | Med | Low | Rate-limit signup per IP + email domain check |
 | i18n missed keys break EN UI | Med | Low | i18n linter fails CI on missing keys |
