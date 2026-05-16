@@ -4,7 +4,10 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { Providers } from "../lib/providers";
 
-export const metadata = { title: "Operational Web App" };
+export const metadata = {
+  title: "BroSolution — Operational Grosir",
+  description: "POS, inventory, and reports for Indonesian wholesale teams.",
+};
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const locale = await getLocale();
