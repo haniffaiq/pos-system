@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-process.env.REDIS_URL ??= "redis://localhost:6379";
+const describeWithRedis = process.env.REDIS_URL ? describe : describe.skip;
+
 const queuePrefix = `test-${process.pid}-${Date.now()}`;
 process.env.BULLMQ_QUEUE_PREFIX = queuePrefix;
 
@@ -29,36 +30,36 @@ async function cleanupQueueKeys(): Promise<void> {
   } while (cursor !== "0");
 }
 
-beforeAll(async () => {
-  ({ redis } = await import("../lib/redis"));
-  ({
-    provisioningQueue,
-    emailQueue,
-    lowStockScanQueue,
-    exportGenerationQueue,
-    QUEUE_NAMES,
-  } = await import("./queues"));
-  ({ WORKER_QUEUE_NAMES } = await import("../worker"));
-});
+describeWithRedis("queues", () => {
+  beforeAll(async () => {
+    ({ redis } = await import("../lib/redis"));
+    ({
+      provisioningQueue,
+      emailQueue,
+      lowStockScanQueue,
+      exportGenerationQueue,
+      QUEUE_NAMES,
+    } = await import("./queues"));
+    ({ WORKER_QUEUE_NAMES } = await import("../worker"));
+  });
 
-afterEach(async () => {
-  await provisioningQueue?.drain(true);
-  await emailQueue?.drain(true);
-  await lowStockScanQueue?.drain(true);
-  await exportGenerationQueue?.drain(true);
-  await cleanupQueueKeys();
-});
+  afterEach(async () => {
+    await provisioningQueue?.drain(true);
+    await emailQueue?.drain(true);
+    await lowStockScanQueue?.drain(true);
+    await exportGenerationQueue?.drain(true);
+    await cleanupQueueKeys();
+  });
 
-afterAll(async () => {
-  await provisioningQueue?.close();
-  await emailQueue?.close();
-  await lowStockScanQueue?.close();
-  await exportGenerationQueue?.close();
-  await cleanupQueueKeys();
-  await redis?.quit();
-});
+  afterAll(async () => {
+    await provisioningQueue?.close();
+    await emailQueue?.close();
+    await lowStockScanQueue?.close();
+    await exportGenerationQueue?.close();
+    await cleanupQueueKeys();
+    await redis?.quit();
+  });
 
-describe("queues", () => {
   it("uses stable queue names that match worker registration", () => {
     expect(QUEUE_NAMES).toEqual(["provisioning", "email", "low-stock-scan", "export-generation"]);
     expect(WORKER_QUEUE_NAMES).toEqual(QUEUE_NAMES);

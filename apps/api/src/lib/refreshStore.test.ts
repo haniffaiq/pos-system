@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-process.env.REDIS_URL ??= "redis://localhost:6379";
+const describeWithRedis = process.env.REDIS_URL ? describe : describe.skip;
 
 let redis: typeof import("./redis")["redis"];
 let saveRefresh: typeof import("./refreshStore")["saveRefresh"];
@@ -26,21 +26,21 @@ async function cleanupRefreshKeys(): Promise<void> {
   } while (cursor !== "0");
 }
 
-beforeAll(async () => {
-  ({ redis } = await import("./redis"));
-  ({ saveRefresh, isRefreshValid, revokeRefresh } = await import("./refreshStore"));
-});
+describeWithRedis("refresh store", () => {
+  beforeAll(async () => {
+    ({ redis } = await import("./redis"));
+    ({ saveRefresh, isRefreshValid, revokeRefresh } = await import("./refreshStore"));
+  });
 
-afterEach(async () => {
-  await cleanupRefreshKeys();
-});
+  afterEach(async () => {
+    await cleanupRefreshKeys();
+  });
 
-afterAll(async () => {
-  await cleanupRefreshKeys();
-  await redis?.quit();
-});
+  afterAll(async () => {
+    await cleanupRefreshKeys();
+    await redis?.quit();
+  });
 
-describe("refresh store", () => {
   it("saves a jti with ttl then validates it", async () => {
     await saveRefresh(user("user1"), "jti-1", 60);
 

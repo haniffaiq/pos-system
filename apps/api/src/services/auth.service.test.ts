@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-process.env.REDIS_URL ??= "redis://localhost:6379";
 process.env.JWT_ACCESS_SECRET = "test_access";
 process.env.JWT_REFRESH_SECRET = "test_refresh";
 process.env.ACCESS_TOKEN_TTL = "900";
@@ -12,8 +11,8 @@ import { hashPassword } from "../lib/password";
 import { redis } from "../lib/redis";
 import { loginPlatformAdmin, loginTenantUser, logout, refresh } from "./auth.service";
 
-const hasDatabase = Boolean(process.env.DATABASE_URL && process.env.DATABASE_ADMIN_URL);
-const describeWithDatabase = hasDatabase ? describe : describe.skip;
+const hasAuthInfra = Boolean(process.env.DATABASE_URL && process.env.DATABASE_ADMIN_URL && process.env.REDIS_URL);
+const describeWithAuthInfra = hasAuthInfra ? describe : describe.skip;
 const testNamespace = `auth-${process.pid}-${Date.now()}`;
 const refreshSubjects = new Set<string>();
 
@@ -30,7 +29,7 @@ async function cleanupRefreshKeys(): Promise<void> {
   }
 }
 
-describeWithDatabase("auth.service", () => {
+describeWithAuthInfra("auth.service", () => {
   let tenantSlug: string;
   let tenantUserEmail: string;
   let inactiveTenantSlug: string;

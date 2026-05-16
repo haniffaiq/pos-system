@@ -6,6 +6,7 @@
     "migrate": "tsx db/migrate.ts",
     "seed:admin": "tsx db/seeds/seed-admin.ts",
     "test": "pnpm -r --filter './apps/*' --filter './packages/*' test",
+    "test:redis": "REDIS_URL=${REDIS_URL:-redis://localhost:6379} pnpm --filter @app/api test -- --run src/lib/refreshStore.test.ts src/queue/queues.test.ts",
     "test:e2e": "pnpm --filter @app/e2e test"
   },
   "devDependencies": {
