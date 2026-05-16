@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { withAdmin } from "../db/withTenant";
 import { AppError } from "../lib/errors";
 import { authMiddleware } from "../middleware/auth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { getModule } from "../modules/registry";
 
 declare module "hono" {
@@ -37,7 +38,7 @@ tenantRoutes.use("/:tenantId/*", authMiddleware, async (c, next) => {
   }
 
   c.set("sector", tenant.sector);
-  await next();
+  return requireActiveSubscription(c, next);
 });
 
 tenantRoutes.get("/:tenantId/me", (c) => {
