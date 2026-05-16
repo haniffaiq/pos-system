@@ -29,10 +29,11 @@ vi.mock("../services/quota.service", () => ({
 interface TenantLookupRow {
   sector: Sector;
   status: TenantStatus;
+  slug: string;
 }
 
 function tenantRow(sector: Sector = "grosir", status: TenantStatus = "active"): TenantLookupRow {
-  return { sector, status };
+  return { sector, status, slug: "warung-maju" };
 }
 
 function testApp() {
@@ -134,6 +135,7 @@ describe("tenant routes", () => {
     expect(await response.json()).toEqual({
       userId: "user-1",
       tenantId,
+      tenantSlug: "warung-maju",
       role: "manager",
       sector: "retail",
     });

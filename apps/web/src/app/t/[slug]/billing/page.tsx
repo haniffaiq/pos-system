@@ -4,6 +4,7 @@ import React from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Badge, Button, Card, Table } from "@app/ui";
+import { fetchTenantContext, tenantContextKey, tenantQueryKey } from "@/lib/tenant";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -32,11 +33,13 @@ function quotaEntries(quota: Record<string, unknown>): string[] {
   return Object.entries(quota).map(([key, value]) => `${key}: ${String(value)}`);
 }
 
-export default function BillingPage() {
+export default function BillingPage({ params }: { params: { slug: string } }) {
   const t = useTranslations("billing");
+  const { data: ctx } = useQuery({ queryKey: tenantContextKey(params.slug), queryFn: () => fetchTenantContext(params.slug) });
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["billing", "summary"],
+    queryKey: tenantQueryKey(ctx?.tenantId, "billing", "summary"),
     queryFn: () => billingFetch<BillingSummary>("/summary"),
+    enabled: Boolean(ctx?.tenantId),
   });
   const checkout = useMutation({
     mutationFn: (plan: "pro" | "business") =>

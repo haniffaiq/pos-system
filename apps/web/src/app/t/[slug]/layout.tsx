@@ -9,7 +9,7 @@ import { Button, Navbar } from "@app/ui";
 import { RequireRole } from "@/components/RequireRole";
 import { apiFetch } from "@/lib/api";
 import { clearSession } from "@/lib/auth";
-import { fetchTenantContext } from "@/lib/tenant";
+import { fetchTenantContext, tenantContextKey } from "@/lib/tenant";
 
 interface Props {
   children: ReactNode;
@@ -20,7 +20,7 @@ export default function TenantLayout({ children, params }: Props) {
   const router = useRouter();
   const pathname = usePathname() ?? "";
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { data: ctx } = useQuery({ queryKey: ["tenant-ctx"], queryFn: fetchTenantContext });
+  const { data: ctx } = useQuery({ queryKey: tenantContextKey(params.slug), queryFn: () => fetchTenantContext(params.slug) });
 
   async function logOut() {
     try {

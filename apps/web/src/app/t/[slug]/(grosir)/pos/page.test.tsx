@@ -4,6 +4,13 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PosPage from "./page";
 
+
+vi.mock("@/lib/tenant", () => ({
+  fetchTenantContext: vi.fn(async () => ({ userId: "user-1", tenantId: "tenant-1", tenantSlug: "warung-maju", role: "owner", sector: "grosir" })),
+  tenantContextKey: (slug: string) => ["tenant-ctx", slug],
+  tenantQueryKey: (tenantId: string | null | undefined, ...parts: string[]) => ["tenant", tenantId ?? "unknown", ...parts],
+}));
+
 vi.mock("@/lib/grosir", () => ({
   grosirApi: vi.fn(),
 }));
@@ -56,10 +63,10 @@ describe("POS / Penjualan page", () => {
       throw new Error(`unexpected request ${path}`);
     });
 
-    renderWithQuery(<PosPage />);
+    renderWithQuery(<PosPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByRole("heading", { name: "Penjualan" })).toBeTruthy();
-    expect(grosirApi).toHaveBeenCalledWith("/products?activeOnly=true");
+    await waitFor(() => expect(grosirApi).toHaveBeenCalledWith("/products?activeOnly=true"));
 
     fireEvent.change(screen.getByPlaceholderText("Cari produk / SKU"), { target: { value: "beras" } });
     expect(screen.getByText("Beras 5kg")).toBeTruthy();
@@ -88,7 +95,7 @@ describe("POS / Penjualan page", () => {
       throw new Error(`unexpected request ${path}`);
     });
 
-    renderWithQuery(<PosPage />);
+    renderWithQuery(<PosPage params={{ slug: "warung-maju" }} />);
 
     fireEvent.click(await screen.findByRole("button", { name: /Tambah Minyak 1L/i }));
     expect(screen.getByText("Total: Rp 18.000")).toBeTruthy();

@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Card, Input, Select, Table } from "@app/ui";
 import { formatRupiah } from "@/lib/format";
 import { grosirApi } from "@/lib/grosir";
-import { fetchTenantContext } from "@/lib/tenant";
+import { fetchTenantContext, tenantContextKey, tenantQueryKey } from "@/lib/tenant";
 
 interface Named {
   id: string;
@@ -50,24 +50,29 @@ function lineBaseQty(line: Line, product: Product | undefined): number {
   return line.qty;
 }
 
-export default function StockInPage() {
+export default function StockInPage({ params }: { params: { slug: string } }) {
   const qc = useQueryClient();
   const [supplierId, setSupplierId] = useState("");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [draft, setDraft] = useState<Line>(emptyLine);
-  const productsKey = ["grosir-products"];
-
-  const { data: ctx } = useQuery({ queryKey: ["tenant-ctx"], queryFn: fetchTenantContext });
+  const { data: ctx } = useQuery({ queryKey: tenantContextKey(params.slug), queryFn: () => fetchTenantContext(params.slug) });
+  const productsKey = tenantQueryKey(ctx?.tenantId, "grosir-products");
   const canWrite = ctx?.role === "owner" || ctx?.role === "manager";
-  const { data: products = [] } = useQuery({ queryKey: productsKey, queryFn: () => grosirApi<Product[]>("/products") });
+  const { data: products = [] } = useQuery({
+    queryKey: productsKey,
+    queryFn: () => grosirApi<Product[]>("/products"),
+    enabled: Boolean(ctx?.tenantId),
+  });
   const { data: units = [] } = useQuery({
-    queryKey: ["grosir-masterdata", "/masterdata/units"],
+    queryKey: tenantQueryKey(ctx?.tenantId, "grosir-masterdata", "/masterdata/units"),
     queryFn: () => grosirApi<Named[]>("/masterdata/units"),
+    enabled: Boolean(ctx?.tenantId),
   });
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["grosir-masterdata", "/masterdata/suppliers"],
+    queryKey: tenantQueryKey(ctx?.tenantId, "grosir-masterdata", "/masterdata/suppliers"),
     queryFn: () => grosirApi<Named[]>("/masterdata/suppliers"),
+    enabled: Boolean(ctx?.tenantId),
   });
 
   const productsById = new Map(products.map((product) => [product.id, product]));

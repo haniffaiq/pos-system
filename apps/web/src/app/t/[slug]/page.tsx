@@ -6,7 +6,7 @@ import { Badge, Card } from "@app/ui";
 import { apiFetch } from "@/lib/api";
 import { formatRupiah } from "@/lib/format";
 import { grosirApi } from "@/lib/grosir";
-import { fetchTenantContext } from "@/lib/tenant";
+import { fetchTenantContext, tenantContextKey, tenantQueryKey } from "@/lib/tenant";
 
 interface BillingSummary {
   plan: { quota?: Record<string, number | null | undefined> } | null;
@@ -73,13 +73,13 @@ function QuotaUsageBars({ summary }: { summary?: BillingSummary }) {
   );
 }
 
-function GrosirDashboard({ role }: { role: string }) {
+function GrosirDashboard({ role, tenantId }: { role: string; tenantId: string }) {
   const {
     data,
     isError,
     isLoading,
-  } = useQuery({ queryKey: ["/dashboard"], queryFn: () => grosirApi<Dashboard>("/dashboard") });
-  const { data: billingSummary } = useQuery({ queryKey: ["/billing/summary"], queryFn: () => apiFetch<BillingSummary>("/billing/summary") });
+  } = useQuery({ queryKey: tenantQueryKey(tenantId, "/dashboard"), queryFn: () => grosirApi<Dashboard>("/dashboard") });
+  const { data: billingSummary } = useQuery({ queryKey: tenantQueryKey(tenantId, "/billing/summary"), queryFn: () => apiFetch<BillingSummary>("/billing/summary") });
 
   if (isLoading) return <p className="text-fg/70">Loading…</p>;
 
@@ -136,12 +136,12 @@ function GrosirDashboard({ role }: { role: string }) {
   );
 }
 
-export default function TenantDashboard() {
-  const { data: ctx } = useQuery({ queryKey: ["tenant-ctx"], queryFn: fetchTenantContext });
+export default function TenantDashboard({ params }: { params: { slug: string } }) {
+  const { data: ctx } = useQuery({ queryKey: tenantContextKey(params.slug), queryFn: () => fetchTenantContext(params.slug) });
 
   if (!ctx) return <p className="text-fg/70">Loading…</p>;
 
-  if (ctx.sector === "grosir") return <GrosirDashboard role={ctx.role} />;
+  if (ctx.sector === "grosir") return <GrosirDashboard role={ctx.role} tenantId={ctx.tenantId} />;
 
   return (
     <Card className="max-w-lg">

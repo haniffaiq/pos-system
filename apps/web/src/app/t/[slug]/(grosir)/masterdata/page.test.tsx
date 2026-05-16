@@ -10,6 +10,8 @@ vi.mock("@/lib/grosir", () => ({
 
 vi.mock("@/lib/tenant", () => ({
   fetchTenantContext: vi.fn(),
+  tenantContextKey: (slug: string) => ["tenant-ctx", slug],
+  tenantQueryKey: (tenantId: string | null | undefined, ...parts: string[]) => ["tenant", tenantId ?? "unknown", ...parts],
 }));
 
 import { grosirApi } from "@/lib/grosir";
@@ -40,7 +42,7 @@ describe("grosir master data page", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    renderWithQuery(<MasterDataPage />);
+    renderWithQuery(<MasterDataPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Master Data")).toBeTruthy();
     expect(await screen.findByText("Beras")).toBeTruthy();
@@ -63,7 +65,7 @@ describe("grosir master data page", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    renderWithQuery(<MasterDataPage />);
+    renderWithQuery(<MasterDataPage params={{ slug: "warung-maju" }} />);
 
     const supplierInput = await screen.findByLabelText("Nama Supplier");
     fireEvent.change(supplierInput, { target: { value: "Toko Makmur" } });
@@ -92,7 +94,7 @@ describe("grosir master data page", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    renderWithQuery(<MasterDataPage />);
+    renderWithQuery(<MasterDataPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Minuman")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Tambah/ })).toBeNull();

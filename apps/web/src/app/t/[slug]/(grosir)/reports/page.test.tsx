@@ -10,6 +10,8 @@ vi.mock("@/lib/grosir", () => ({
 
 vi.mock("@/lib/tenant", () => ({
   fetchTenantContext: vi.fn(),
+  tenantContextKey: (slug: string) => ["tenant-ctx", slug],
+  tenantQueryKey: (tenantId: string | null | undefined, ...parts: string[]) => ["tenant", tenantId ?? "unknown", ...parts],
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -72,8 +74,6 @@ function mockReportApis() {
 
 beforeEach(() => {
   vi.mocked(getSession).mockReturnValue({
-    accessToken: "access-token",
-    refreshToken: "refresh-token",
     role: "owner",
     tenantId: "tenant-1",
   });
@@ -88,7 +88,7 @@ afterEach(() => {
 
 describe("grosir reports page", () => {
   it("shows sales and stock reports for the selected date range", async () => {
-    renderWithQuery(<ReportsPage />);
+    renderWithQuery(<ReportsPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByRole("heading", { name: "Laporan" })).toBeTruthy();
     expect(await screen.findByText("INV-001")).toBeTruthy();
@@ -108,7 +108,7 @@ describe("grosir reports page", () => {
   });
 
   it("starts sales and stock export jobs with the selected date range and shows polling status", async () => {
-    renderWithQuery(<ReportsPage />);
+    renderWithQuery(<ReportsPage params={{ slug: "warung-maju" }} />);
 
     fireEvent.change(await screen.findByLabelText("Dari"), { target: { value: "2026-05-01" } });
     fireEvent.change(screen.getByLabelText("Sampai"), { target: { value: "2026-05-14" } });
@@ -153,7 +153,7 @@ describe("grosir reports page", () => {
       return element as HTMLElement;
     });
 
-    renderWithQuery(<ReportsPage />);
+    renderWithQuery(<ReportsPage params={{ slug: "warung-maju" }} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Download sales export" }));
 
@@ -180,7 +180,7 @@ describe("grosir reports page", () => {
       sector: "grosir",
     });
 
-    renderWithQuery(<ReportsPage />);
+    renderWithQuery(<ReportsPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Owner/manager only")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Export CSV penjualan" })).toBeNull();

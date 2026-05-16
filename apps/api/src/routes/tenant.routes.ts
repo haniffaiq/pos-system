@@ -11,6 +11,7 @@ import { getModule } from "../modules/registry";
 declare module "hono" {
   interface ContextVariableMap {
     sector: Sector;
+    tenantSlug: string;
   }
 }
 
@@ -25,7 +26,7 @@ tenantRoutes.use("/:tenantId/*", authMiddleware, async (c, next) => {
   }
 
   const tenant = await withAdmin(async (q) => {
-    const result = await q<{ sector: Sector; status: string }>("select sector, status from tenants where id = $1", [
+    const result = await q<{ sector: Sector; status: string; slug: string }>("select sector, status, slug from tenants where id = $1", [
       pathTenantId,
     ]);
     return result.rows[0];
@@ -39,6 +40,7 @@ tenantRoutes.use("/:tenantId/*", authMiddleware, async (c, next) => {
   }
 
   c.set("sector", tenant.sector);
+  c.set("tenantSlug", tenant.slug);
   return requireActiveSubscription(c, next);
 });
 
@@ -47,6 +49,7 @@ tenantRoutes.get("/:tenantId/me", (c) => {
   return c.json({
     userId: auth.sub,
     tenantId: auth.tenantId,
+    tenantSlug: c.get("tenantSlug"),
     role: auth.role,
     sector: c.get("sector"),
   });

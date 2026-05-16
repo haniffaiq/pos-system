@@ -4,6 +4,13 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import NotificationsPage from "./page";
 
+
+vi.mock("@/lib/tenant", () => ({
+  fetchTenantContext: vi.fn(async () => ({ userId: "user-1", tenantId: "tenant-1", tenantSlug: "warung-maju", role: "owner", sector: "grosir" })),
+  tenantContextKey: (slug: string) => ["tenant-ctx", slug],
+  tenantQueryKey: (tenantId: string | null | undefined, ...parts: string[]) => ["tenant", tenantId ?? "unknown", ...parts],
+}));
+
 vi.mock("@/lib/grosir", () => ({
   grosirApi: vi.fn(),
 }));
@@ -34,7 +41,7 @@ describe("grosir notifications page", () => {
       },
     ]);
 
-    renderWithQuery(<NotificationsPage />);
+    renderWithQuery(<NotificationsPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByRole("heading", { name: "Notifikasi" })).toBeTruthy();
     expect(await screen.findByText("Stok menipis")).toBeTruthy();
@@ -64,7 +71,7 @@ describe("grosir notifications page", () => {
       throw new Error(`unexpected call ${path}`);
     });
 
-    renderWithQuery(<NotificationsPage />);
+    renderWithQuery(<NotificationsPage params={{ slug: "warung-maju" }} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Tandai dibaca" }));
 
@@ -76,7 +83,7 @@ describe("grosir notifications page", () => {
   it("shows an empty state when the tenant has no notifications", async () => {
     vi.mocked(grosirApi).mockResolvedValue([]);
 
-    renderWithQuery(<NotificationsPage />);
+    renderWithQuery(<NotificationsPage params={{ slug: "warung-maju" }} />);
 
     expect(await screen.findByText("Belum ada notifikasi." )).toBeTruthy();
   });

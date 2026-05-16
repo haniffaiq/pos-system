@@ -7,6 +7,7 @@ import { Button, Input, Select } from "@app/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { grosirApi } from "@/lib/grosir";
+import { tenantQueryKey } from "@/lib/tenant";
 
 interface Named {
   id: string;
@@ -18,6 +19,7 @@ type ProductFormInitial = ProductInput & { id: string };
 interface ProductFormProps {
   initial?: ProductFormInitial;
   onDone: () => void;
+  tenantId?: string;
 }
 
 function emptyToUndefined(value: unknown): unknown {
@@ -40,14 +42,16 @@ function cleanProductInput(values: ProductInput): ProductInput {
   return productSchema.parse(cleaned);
 }
 
-export function ProductForm({ initial, onDone }: ProductFormProps) {
+export function ProductForm({ initial, onDone, tenantId }: ProductFormProps) {
   const { data: units = [] } = useQuery({
-    queryKey: ["grosir-masterdata", "/masterdata/units"],
+    queryKey: tenantQueryKey(tenantId, "grosir-masterdata", "/masterdata/units"),
     queryFn: () => grosirApi<Named[]>("/masterdata/units"),
+    enabled: Boolean(tenantId),
   });
   const { data: categories = [] } = useQuery({
-    queryKey: ["grosir-masterdata", "/masterdata/categories"],
+    queryKey: tenantQueryKey(tenantId, "grosir-masterdata", "/masterdata/categories"),
     queryFn: () => grosirApi<Named[]>("/masterdata/categories"),
+    enabled: Boolean(tenantId),
   });
 
   const {

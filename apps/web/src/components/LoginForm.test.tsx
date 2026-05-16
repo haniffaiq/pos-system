@@ -100,6 +100,7 @@ describe("LoginForm", () => {
     expect(mockedSetSession).toHaveBeenCalledWith({
       role: "owner",
       tenantId: "tenant-1",
+      tenantSlug: "warung-maju",
     });
     expect(push).toHaveBeenCalledWith("/t/warung-maju");
   });
@@ -127,7 +128,7 @@ describe("LoginForm", () => {
         body: JSON.stringify({ challengeToken: "challenge-1", method: "totp", code: "654321" }),
       }),
     );
-    expect(mockedSetSession).toHaveBeenCalledWith({ role: "owner", tenantId: "tenant-1" });
+    expect(mockedSetSession).toHaveBeenCalledWith({ role: "owner", tenantId: "tenant-1", tenantSlug: "warung-maju" });
     expect(push).toHaveBeenCalledWith("/t/warung-maju");
   });
 });

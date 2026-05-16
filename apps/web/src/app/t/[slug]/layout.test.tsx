@@ -14,6 +14,8 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/tenant", () => ({
   fetchTenantContext: vi.fn(),
+  tenantContextKey: (slug: string) => ["tenant-ctx", slug],
+  tenantQueryKey: (tenantId: string | null | undefined, ...parts: string[]) => ["tenant", tenantId ?? "unknown", ...parts],
 }));
 
 vi.mock("@/lib/api", () => ({
