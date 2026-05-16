@@ -8,11 +8,7 @@ vi.mock("../components/marketing/Hero", () => ({
 }));
 
 vi.mock("../components/marketing/Header", () => ({
-  Header: ({ locale }: { locale: string }) => <header data-locale={locale} data-testid="marketing-header">Header</header>,
-}));
-
-vi.mock("next-intl/server", () => ({
-  getLocale: () => Promise.resolve("id"),
+  Header: () => <header data-testid="marketing-header">Header</header>,
 }));
 
 vi.mock("../components/marketing/SocialProof", () => ({
@@ -24,8 +20,8 @@ vi.mock("../components/marketing/Features", () => ({
 }));
 
 describe("home page marketing landing", () => {
-  it("renders the marketing header and sections in spec order", async () => {
-    const html = renderToStaticMarkup(await Home());
+  it("renders the marketing header and sections in spec order", () => {
+    const html = renderToStaticMarkup(<Home />);
 
     const headerIndex = html.indexOf('data-testid="marketing-header"');
     const heroIndex = html.indexOf('data-testid="hero"');

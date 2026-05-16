@@ -1,12 +1,18 @@
 "use client";
 
 import React, { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import type { Locale } from "@/i18n";
 import { LangToggle } from "./LangToggle";
 
-export function Header({ locale }: { locale: Locale }) {
+function normalizeLocale(locale: string): Locale {
+  return locale === "en" ? "en" : "id";
+}
+
+export function Header({ locale: localeProp }: { locale?: Locale }) {
+  const intlLocale = useLocale();
+  const activeLocale = normalizeLocale(localeProp ?? intlLocale);
   const t = useTranslations("nav");
   const tRoot = useTranslations();
   const [loginOpen, setLoginOpen] = useState(false);
@@ -33,7 +39,7 @@ export function Header({ locale }: { locale: Locale }) {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <LangToggle current={locale} />
+          <LangToggle current={activeLocale} />
 
           <div className="relative">
             <button
