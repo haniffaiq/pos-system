@@ -1,0 +1,61 @@
+name: operational-web-app
+
+# Run with the app stack so Prometheus can resolve api:4000 on the Compose network:
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml --profile observability up -d
+# Bind UI ports to localhost by default; put Grafana/Prometheus behind Caddy in prod.
+
+services:
+  loki:
+    image: grafana/loki:3.0.0
+    profiles: ["observability"]
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "${LOKI_BIND:-127.0.0.1:3100}:3100"
+    volumes:
+      - ./infra/observability/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    profiles: ["observability"]
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./infra/observability/promtail-config.yml:/etc/promtail/config.yml:ro
+    depends_on:
+      - loki
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    profiles: ["observability"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}
+    ports:
+      - "${PROMETHEUS_BIND:-127.0.0.1:9090}:9090"
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    profiles: ["observability"]
+    ports:
+      - "${GRAFANA_BIND:-127.0.0.1:3001}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change_me_grafana_password}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    depends_on:
+      - loki
+      - prometheus
+
+volumes:
+  loki-data:
+  prom-data:
+  grafana-data:
