@@ -139,6 +139,37 @@ describe("admin routes", () => {
     expect(platformStatsMock).toHaveBeenCalledOnce();
   });
 
+  it("exposes billing PSP config without secret values for a platform admin", async () => {
+    const token = await platformAdminToken();
+    vi.stubEnv("BILLING_ACTIVE_PSP", "midtrans");
+    vi.stubEnv("MIDTRANS_ENV", "sandbox");
+    vi.stubEnv("MIDTRANS_SERVER_KEY", "change_me_midtrans_server_key");
+    vi.stubEnv("MIDTRANS_CLIENT_KEY", "midtrans-client-secret");
+    vi.stubEnv("MIDTRANS_MERCHANT_ID", "midtrans-merchant-secret");
+    vi.stubEnv("XENDIT_ENV", "sandbox");
+    vi.stubEnv("XENDIT_SECRET_KEY", "xendit-secret");
+    vi.stubEnv("XENDIT_PUBLIC_KEY", "xendit-public-secret");
+    vi.stubEnv("XENDIT_WEBHOOK_TOKEN", "xendit-webhook-secret");
+
+    const response = await testApp().request("/api/v1/admin/billing/psp", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      activePsp: "midtrans",
+      effectivePsp: "xendit",
+      fallbackPsp: "xendit",
+      providers: [
+        { name: "midtrans", configured: false, missingConfig: ["MIDTRANS_SERVER_KEY"] },
+        { name: "xendit", configured: true, missingConfig: [] },
+      ],
+    });
+    expect(JSON.stringify(body)).not.toContain("xendit-secret");
+    expect(JSON.stringify(body)).not.toContain("midtrans-client-secret");
+  });
+
   it("rejects invalid tenant list filters with 400", async () => {
     const token = await platformAdminToken();
 

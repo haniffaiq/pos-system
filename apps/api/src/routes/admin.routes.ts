@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { authMiddleware } from "../middleware/auth";
 import { requireRole } from "../middleware/requireRole";
+import { getPaymentProviderConfig } from "../lib/payments/provider";
 import { createTenant, getTenant, listAuditLog, listTenants, platformStats, setTenantStatus } from "../services/tenant.service";
 
 const tenantListFilterSchema = z.object({
@@ -17,6 +18,8 @@ export const adminRoutes = new Hono();
 adminRoutes.use("*", authMiddleware, requireRole("platform_admin"));
 
 adminRoutes.get("/stats", async (c) => c.json(await platformStats()));
+
+adminRoutes.get("/billing/psp", async (c) => c.json(getPaymentProviderConfig()));
 
 adminRoutes.get("/tenants", async (c) => {
   const filter = tenantListFilterSchema.parse({

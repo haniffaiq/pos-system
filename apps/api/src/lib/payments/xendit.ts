@@ -53,7 +53,7 @@ type XenditInvoice = {
 
 type HeaderLike = Headers | Record<string, string | string[] | undefined>;
 
-const REQUIRED_ENV: Array<keyof EnvLike> = ["XENDIT_SECRET_KEY", "XENDIT_PUBLIC_KEY", "XENDIT_WEBHOOK_TOKEN"];
+const REQUIRED_ENV: Array<keyof EnvLike> = ["XENDIT_ENV", "XENDIT_SECRET_KEY", "XENDIT_PUBLIC_KEY", "XENDIT_WEBHOOK_TOKEN"];
 const INVOICES_URL = "https://api.xendit.co/v2/invoices";
 
 function present(value: string | undefined): value is string {
