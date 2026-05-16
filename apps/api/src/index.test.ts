@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   adminQuery: vi.fn(),
   redisPing: vi.fn(),
   logError: vi.fn(),
+  logInfo: vi.fn(),
+  logChild: vi.fn(),
 }));
 
 vi.mock("./db/pool", () => ({
@@ -18,7 +20,7 @@ vi.mock("./lib/redis", () => ({
 }));
 
 vi.mock("./lib/logger", () => ({
-  logger: { error: mocks.logError, info: vi.fn() },
+  logger: { error: mocks.logError, info: vi.fn(), child: mocks.logChild },
   toLogError: (error: unknown) => (error instanceof Error ? { name: error.name } : { name: typeof error }),
 }));
 
@@ -39,8 +41,10 @@ vi.mock("./lib/sentry.js", () => ({
 
 describe("api app skeleton", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     mocks.adminQuery.mockResolvedValue({ rows: [{ healthcheck: 1 }] });
     mocks.redisPing.mockResolvedValue("PONG");
+    mocks.logChild.mockReturnValue({ info: mocks.logInfo });
   });
 
   it("responds to /health", async () => {

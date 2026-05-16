@@ -7,6 +7,7 @@ import { logger } from "./lib/logger";
 import { redis } from "./lib/redis";
 import { initSentry } from "./lib/sentry.js";
 import { onError } from "./middleware/error.js";
+import { requestLogger } from "./middleware/requestLogger";
 import { adminRoutes } from "./routes/admin.routes";
 import { authRoutes } from "./routes/auth.routes";
 import { billingRoutes } from "./routes/billing.routes";
@@ -34,6 +35,7 @@ app.use(
   }),
 );
 app.onError(onError);
+app.use("*", requestLogger);
 app.get("/health", (c) => c.json({ ok: true }));
 app.route(
   "/",
