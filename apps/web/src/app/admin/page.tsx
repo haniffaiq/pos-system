@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { Badge, Card, Table } from "@app/ui";
 import { apiFetch } from "@/lib/api";
 
@@ -11,10 +12,23 @@ interface PlatformStats {
   recent: { id: string; name: string; slug: string; sector: string; createdAt?: string; created_at?: string }[];
 }
 
+interface BillingPspConfig {
+  activePsp: string | null;
+  effectivePsp: string | null;
+  fallbackPsp?: string;
+  providers: { name: string; configured: boolean; missingConfig: string[] }[];
+  error?: { message: string };
+}
+
 export default function AdminDashboard() {
+  const pspT = useTranslations("admin.billingPsp");
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["admin", "stats"],
     queryFn: () => apiFetch<PlatformStats>("/admin/stats"),
+  });
+  const { data: psp } = useQuery({
+    queryKey: ["admin", "billing", "psp"],
+    queryFn: () => apiFetch<BillingPspConfig>("/admin/billing/psp"),
   });
 
   return (
@@ -36,7 +50,7 @@ export default function AdminDashboard() {
               <p className="mt-2 text-sm font-bold text-fg/70">Registered across the platform</p>
             </Card>
 
-            <Card hover className="lg:col-span-2">
+            <Card hover>
               <p className="font-display text-sm font-bold uppercase tracking-wide text-fg/70">By sector</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {data.bySector.length === 0 ? (
@@ -49,6 +63,27 @@ export default function AdminDashboard() {
                   ))
                 )}
               </div>
+            </Card>
+
+            <Card hover>
+              <p className="font-display text-sm font-bold uppercase tracking-wide text-fg/70">{pspT("title")}</p>
+              {psp ? (
+                <div className="mt-2 space-y-2 text-sm font-bold">
+                  <p>{pspT("active", { psp: psp.activePsp ?? pspT("invalid") })}</p>
+                  <p>{pspT("effective", { psp: psp.effectivePsp ?? pspT("none") })}</p>
+                  {psp.fallbackPsp ? <Badge tone="soft">{pspT("fallback", { psp: psp.fallbackPsp })}</Badge> : null}
+                  {psp.providers.map((provider) => (
+                    <p key={provider.name}>
+                      {provider.configured
+                        ? pspT("ready", { psp: provider.name })
+                        : pspT("missing", { psp: provider.name, missing: provider.missingConfig.join(", ") })}
+                    </p>
+                  ))}
+                  {psp.error ? <p className="text-accent">{psp.error.message}</p> : null}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm font-bold text-fg/70">{pspT("loading")}</p>
+              )}
             </Card>
           </div>
 

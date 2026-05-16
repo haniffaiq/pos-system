@@ -37,6 +37,7 @@ export default function TenantLayout({ children, params }: Props) {
           { href: `${base}/adjustments`, label: "Penyesuaian Stok" },
           { href: `${base}/masterdata`, label: "Master Data" },
           { href: `${base}/reports`, label: "Laporan" },
+          { href: `${base}/billing`, label: "Billing" },
           { href: `${base}/notifications`, label: "Notifikasi" },
         ]
       : []),
