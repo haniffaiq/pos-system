@@ -9,6 +9,8 @@ const workerInstances = vi.hoisted(() => [] as Array<{
 }>);
 
 const lowStockAdd = vi.hoisted(() => vi.fn());
+const logInfo = vi.hoisted(() => vi.fn());
+const logError = vi.hoisted(() => vi.fn());
 
 vi.mock("bullmq", () => ({
   Worker: vi.fn().mockImplementation((name: string, processor: unknown, options: unknown) => {
@@ -33,6 +35,11 @@ vi.mock("./lib/redis", () => ({
   redis: { status: "ready" },
 }));
 
+vi.mock("./lib/logger", () => ({
+  logger: { info: logInfo, error: logError },
+  toLogError: (error: unknown) => (error instanceof Error ? { name: error.name } : { name: typeof error }),
+}));
+
 vi.mock("./queue/queues", () => ({
   QUEUE_NAMES: ["provisioning", "email", "low-stock-scan", "export-generation"],
   lowStockScanQueue: { add: lowStockAdd },
@@ -41,12 +48,13 @@ vi.mock("./queue/queues", () => ({
 afterEach(() => {
   workerInstances.length = 0;
   lowStockAdd.mockReset();
+  logInfo.mockReset();
+  logError.mockReset();
   vi.restoreAllMocks();
 });
 
 describe("worker entrypoint", () => {
   it("registers all worker queues with failed-job logging", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { createWorkers } = await import("./worker");
 
     const workers = createWorkers();
@@ -65,13 +73,12 @@ describe("worker entrypoint", () => {
       new Error("low stock failure"),
     );
 
-    expect(consoleError).toHaveBeenCalledWith("worker job failed", {
+    expect(logError).toHaveBeenCalledWith({
       queueName: "low-stock-scan",
       jobId: "job-42",
       jobName: "scan",
-      failedReason: "boom",
-      error: "low stock failure",
-    });
+      error: { name: "Error" },
+    }, "worker job failed");
   });
 
   it("schedules repeatable low-stock scan with stable jobId", async () => {
@@ -87,11 +94,11 @@ describe("worker entrypoint", () => {
 
   it("installs graceful shutdown handlers that close every worker", async () => {
     const once = vi.fn();
-    const logger = vi.fn();
+    const shutdownLogger = { info: vi.fn() };
     const workers = [{ close: vi.fn().mockResolvedValue(undefined) }, { close: vi.fn().mockResolvedValue(undefined) }];
     const { installGracefulShutdown } = await import("./worker");
 
-    installGracefulShutdown(workers, { once }, logger);
+    installGracefulShutdown(workers, { once }, shutdownLogger);
 
     expect(once).toHaveBeenCalledWith("SIGTERM", expect.any(Function));
     expect(once).toHaveBeenCalledWith("SIGINT", expect.any(Function));
@@ -101,7 +108,10 @@ describe("worker entrypoint", () => {
 
     expect(workers[0].close).toHaveBeenCalledOnce();
     expect(workers[1].close).toHaveBeenCalledOnce();
-    expect(logger).toHaveBeenCalledWith("worker received SIGTERM; shutting down gracefully");
-    expect(logger).toHaveBeenCalledWith("worker shutdown complete");
+    expect(shutdownLogger.info).toHaveBeenCalledWith(
+      { signal: "SIGTERM" },
+      "worker received shutdown signal; shutting down gracefully",
+    );
+    expect(shutdownLogger.info).toHaveBeenCalledWith("worker shutdown complete");
   });
 });

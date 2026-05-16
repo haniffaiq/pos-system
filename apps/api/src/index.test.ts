@@ -5,6 +5,7 @@ import { z } from "zod";
 const mocks = vi.hoisted(() => ({
   adminQuery: vi.fn(),
   redisPing: vi.fn(),
+  logError: vi.fn(),
 }));
 
 vi.mock("./db/pool", () => ({
@@ -14,6 +15,11 @@ vi.mock("./db/pool", () => ({
 
 vi.mock("./lib/redis", () => ({
   redis: { ping: mocks.redisPing },
+}));
+
+vi.mock("./lib/logger", () => ({
+  logger: { error: mocks.logError, info: vi.fn() },
+  toLogError: (error: unknown) => (error instanceof Error ? { name: error.name } : { name: typeof error }),
 }));
 
 import { app } from "./index";
@@ -120,7 +126,6 @@ describe("Hono error middleware", () => {
   });
 
   it("sanitizes unknown errors as internal_error and logs the original error", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const testApp = new Hono();
     testApp.onError(onError);
     testApp.get("/boom", () => {
@@ -133,8 +138,7 @@ describe("Hono error middleware", () => {
     expect(await response.json()).toEqual({
       error: { code: "internal_error", message: "Something went wrong" },
     });
-    expect(consoleError).toHaveBeenCalledOnce();
-
-    consoleError.mockRestore();
+    expect(mocks.logError).toHaveBeenCalledOnce();
+    expect(mocks.logError).toHaveBeenCalledWith({ error: { name: "Error" } }, "unhandled request error");
   });
 });

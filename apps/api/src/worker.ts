@@ -1,6 +1,7 @@
 import { Worker, type Job, type Processor, type WorkerOptions } from "bullmq";
 
 import { redis } from "./lib/redis";
+import { logger, toLogError } from "./lib/logger";
 import { emailProcessor } from "./queue/jobs/email";
 import { exportProcessor } from "./queue/jobs/exportGeneration";
 import { lowStockProcessor } from "./queue/jobs/lowStockScan";
@@ -24,13 +25,12 @@ const workerOptions: WorkerOptions = {
 const exportGenerationProcessor: Processor<ExportGenerationJob> = exportProcessor;
 
 function logFailedJob(queueName: string, job: Job | undefined, error: Error): void {
-  console.error("worker job failed", {
+  logger.error({
     queueName,
     jobId: job?.id,
     jobName: job?.name,
-    failedReason: job?.failedReason,
-    error: error.message,
-  });
+    error: toLogError(error),
+  }, "worker job failed");
 }
 
 function createWorker<JobData>(queueName: string, processor: Processor<JobData>): Worker<JobData> {
@@ -58,16 +58,17 @@ type ShutdownSignalTarget = {
 };
 
 type ClosableWorker = Pick<Worker, "close">;
+type ShutdownLogger = Pick<typeof logger, "info">;
 
 export function installGracefulShutdown(
   workers: ClosableWorker[],
   signalTarget: ShutdownSignalTarget = process,
-  logger: (message: string) => void = console.log,
+  shutdownLogger: ShutdownLogger = logger,
 ): void {
   const closeWorkers = async (signal: ShutdownSignal): Promise<void> => {
-    logger(`worker received ${signal}; shutting down gracefully`);
+    shutdownLogger.info({ signal }, "worker received shutdown signal; shutting down gracefully");
     await Promise.all(workers.map((worker) => worker.close()));
-    logger("worker shutdown complete");
+    shutdownLogger.info("worker shutdown complete");
   };
 
   signalTarget.once("SIGTERM", () => closeWorkers("SIGTERM"));
@@ -87,10 +88,10 @@ const isWorkerEntrypoint = entrypoint?.endsWith("/worker.ts") || entrypoint?.end
 if (process.env.NODE_ENV !== "test" && isWorkerEntrypoint) {
   void startWorker()
     .then(() => {
-      console.log("worker started: provisioning, email, low-stock-scan, export-generation");
+      logger.info({ queues: WORKER_QUEUE_NAMES }, "worker started");
     })
     .catch((error: unknown) => {
-      console.error("worker failed to start", error);
+      logger.error({ error: toLogError(error) }, "worker failed to start");
       process.exitCode = 1;
     });
 }
