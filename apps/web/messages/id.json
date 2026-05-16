@@ -80,6 +80,17 @@
       "api": "API Access",
       "customDomain": "Custom Domain",
       "auditUI": "Audit Log UI"
+    },
+    "values": {
+      "no": "—",
+      "yes": "✓",
+      "unlimited": "∞",
+      "days30": "30 hari",
+      "year1": "1 tahun",
+      "forever": "Selamanya",
+      "community": "Komunitas",
+      "email24": "Email <24j",
+      "priorityWa": "Prioritas + WA"
     }
   },
   "faq": {
@@ -91,7 +102,7 @@
       },
       "payment": {
         "q": "Bagaimana cara bayar?",
-        "a": "QRIS, Virtual Account (BCA/Mandiri/BNI/BRI), kartu kredit/debit, dan e-wallet via Midtrans."
+        "a": "Pembayaran akan mendukung Midtrans dan Xendit dengan PSP aktif yang dipilih admin; checkout aktif menyusul di fase billing."
       },
       "refund": {
         "q": "Bisakah refund?",
