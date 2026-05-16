@@ -169,6 +169,9 @@ jobs:
       - name: Run Playwright signup verification gate
         run: pnpm --filter @app/e2e test:signup
 
+      - name: Run Playwright billing sandbox gate
+        run: pnpm --filter @app/e2e test:billing
+
       - name: Restart API with billing gates enabled
         env:
           AUTH_MFA_BYPASS_EMAILS: "*"
