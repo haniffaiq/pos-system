@@ -128,6 +128,8 @@ jobs:
           pnpm seed:plans
 
       - name: Start API, worker, and web
+        env:
+          RATE_LIMIT_DISABLED: "true"
         run: |
           mkdir -p "$EXPORT_DIR"
           pnpm --filter @app/api exec tsx src/index.ts > /tmp/pos-api.log 2>&1 &
@@ -166,6 +168,15 @@ jobs:
 
       - name: Run Playwright signup verification gate
         run: pnpm --filter @app/e2e test:signup
+
+      - name: Seed quota tenants
+        id: seed_quota
+        run: |
+          bash e2e/seed-quota.sh >> "$GITHUB_ENV"
+          echo "Seeded quota e2e tenants"
+
+      - name: Run Playwright quota gate
+        run: pnpm --filter @app/e2e test:quota
 
       - name: Upload Playwright report
         if: always()
