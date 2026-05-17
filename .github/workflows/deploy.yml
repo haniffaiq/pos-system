@@ -1,0 +1,260 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment target
+        type: choice
+        options: [staging, prod]
+        default: staging
+        required: true
+      ref:
+        description: Git ref or SHA to deploy; defaults to the workflow SHA
+        type: string
+        required: false
+      auto_rollback:
+        description: Roll app containers back to the previous commit if deploy smoke fails
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event_name == 'push' && 'staging' || inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event_name == 'push' && 'staging' || inputs.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ github.event_name == 'push' && 'staging' || inputs.target }}
+    env:
+      DEPLOY_TARGET: ${{ github.event_name == 'push' && 'staging' || inputs.target }}
+      DEPLOY_REF: ${{ inputs.ref || github.sha }}
+      AUTO_ROLLBACK: ${{ github.event_name == 'push' && 'true' || inputs.auto_rollback }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/brosolution' }}
+      STAGING_ENV_FILE: ${{ secrets.DEPLOY_STAGING_ENV_FILE || '.env.staging' }}
+      PROD_ENV_FILE: ${{ secrets.DEPLOY_PROD_ENV_FILE || '.env.prod' }}
+      STAGING_SMOKE_URL: ${{ secrets.DEPLOY_STAGING_SMOKE_URL }}
+      PROD_SMOKE_URL: ${{ secrets.DEPLOY_PROD_SMOKE_URL }}
+
+    steps:
+      - name: Checkout deploy ref for audit context
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pre-deploy verification
+        run: |
+          pnpm test
+          pnpm --filter @app/api build
+          pnpm --filter @app/web build
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DEPLOY_TARGET: ${{ env.DEPLOY_TARGET }}
+          DEPLOY_REF: ${{ env.DEPLOY_REF }}
+          AUTO_ROLLBACK: ${{ env.AUTO_ROLLBACK }}
+          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+          STAGING_ENV_FILE: ${{ env.STAGING_ENV_FILE }}
+          PROD_ENV_FILE: ${{ env.PROD_ENV_FILE }}
+          STAGING_SMOKE_URL: ${{ env.STAGING_SMOKE_URL }}
+          PROD_SMOKE_URL: ${{ env.PROD_SMOKE_URL }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          command_timeout: 30m
+          envs: DEPLOY_TARGET,DEPLOY_REF,AUTO_ROLLBACK,DEPLOY_PATH,STAGING_ENV_FILE,PROD_ENV_FILE,STAGING_SMOKE_URL,PROD_SMOKE_URL
+          script_stop: true
+          script: |
+            set -Eeuo pipefail
+
+            cd "$DEPLOY_PATH"
+
+            case "$DEPLOY_TARGET" in
+              staging)
+                ENV_FILE="$STAGING_ENV_FILE"
+                COMPOSE_FILES="-f docker-compose.prod.yml -f docker-compose.staging.yml"
+                SMOKE_URL="$STAGING_SMOKE_URL"
+                ;;
+              prod)
+                ENV_FILE="$PROD_ENV_FILE"
+                COMPOSE_FILES="-f docker-compose.prod.yml"
+                SMOKE_URL="$PROD_SMOKE_URL"
+                ;;
+              *)
+                echo "Unsupported DEPLOY_TARGET=$DEPLOY_TARGET" >&2
+                exit 64
+                ;;
+            esac
+
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "Expected env file $ENV_FILE to exist on the deploy host" >&2
+              exit 66
+            fi
+
+            if git ls-files --error-unmatch "$ENV_FILE" >/dev/null 2>&1; then
+              echo "$ENV_FILE is tracked by git; refusing to deploy committed secrets" >&2
+              exit 65
+            fi
+
+            load_env_file() {
+              while IFS= read -r line || [ -n "$line" ]; do
+                case "$line" in
+                  ''|'#'*) continue ;;
+                esac
+                key=${line%%=*}
+                value=${line#*=}
+                case "$key" in
+                  ''|*[!A-Za-z0-9_]*)
+                    echo "Invalid environment key in $ENV_FILE: $key" >&2
+                    exit 65
+                    ;;
+                esac
+                value=${value%$'\r'}
+                value=${value%\"}; value=${value#\"}
+                value=${value%\'}; value=${value#\'}
+                export "$key=$value"
+              done < "$ENV_FILE"
+            }
+
+            compose() {
+              # shellcheck disable=SC2086
+              docker compose --env-file "$ENV_FILE" $COMPOSE_FILES --profile prod "$@"
+            }
+
+            env_present() {
+              key="$1"
+              eval "value=\${$key:-}"
+              [ -n "$value" ]
+            }
+
+            psp_complete() {
+              case "$1" in
+                midtrans)
+                  env_present MIDTRANS_SERVER_KEY && env_present MIDTRANS_CLIENT_KEY && env_present MIDTRANS_MERCHANT_ID
+                  ;;
+                xendit)
+                  env_present XENDIT_SECRET_KEY && env_present XENDIT_WEBHOOK_TOKEN
+                  ;;
+                *) return 1 ;;
+              esac
+            }
+
+            validate_billing_env() {
+              enabled=$(printf '%s' "${BILLING_ENABLED:-true}" | tr '[:upper:]' '[:lower:]')
+              [ "$enabled" = "false" ] && return 0
+              active="${BILLING_ACTIVE_PSP:-midtrans}"
+              case "$active" in
+                midtrans) fallback=xendit ;;
+                xendit) fallback=midtrans ;;
+                *)
+                  echo "BILLING_ACTIVE_PSP must be midtrans or xendit" >&2
+                  exit 65
+                  ;;
+              esac
+              if psp_complete "$active"; then
+                echo "Billing active PSP env is complete for $active"
+              elif psp_complete "$fallback"; then
+                echo "Billing active PSP env is incomplete for $active; deploy allowed because $fallback fallback env is complete"
+              else
+                echo "Billing is enabled but neither active PSP nor fallback PSP has complete deploy env" >&2
+                exit 65
+              fi
+            }
+
+            previous_sha=$(git rev-parse HEAD)
+            echo "Previous deployed commit: $previous_sha"
+            echo "Target commit/ref: $DEPLOY_REF"
+
+            rollback_app() {
+              if [ "$AUTO_ROLLBACK" != "true" ]; then
+                echo "Auto rollback disabled; leaving failed target checkout for investigation" >&2
+                return 0
+              fi
+              echo "Rolling app containers back to $previous_sha" >&2
+              git checkout --detach "$previous_sha"
+              load_env_file
+              compose up -d --build api web worker caddy
+            }
+
+            git fetch --prune origin
+            git checkout --detach "$DEPLOY_REF"
+
+            corepack enable
+            pnpm install --frozen-lockfile
+
+            echo "Validating compose configuration without printing secrets"
+            compose config --quiet
+
+            echo "Validating billing PSP deploy environment and fallback readiness"
+            load_env_file
+            validate_billing_env
+
+            echo "Running additive database migrations before app restart"
+            if ! pnpm migrate; then
+              echo "Migration failed. Database rollback is intentionally not attempted; migrations must be forward-fixed." >&2
+              git checkout --detach "$previous_sha"
+              exit 1
+            fi
+
+            if ! compose up -d --build --remove-orphans; then
+              rollback_app
+              exit 1
+            fi
+
+            echo "Waiting for API and web containers to become healthy"
+            for service in api web; do
+              for attempt in $(seq 1 30); do
+                container_id=$(compose ps -q "$service")
+                status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)
+                if [ "$status" = "healthy" ] || [ "$status" = "running" ]; then
+                  break
+                fi
+                if [ "$attempt" = "30" ]; then
+                  echo "$service did not become healthy; recent logs follow" >&2
+                  compose logs --tail=120 "$service" >&2 || true
+                  rollback_app
+                  exit 1
+                fi
+                sleep 5
+              done
+            done
+
+            if [ -n "$SMOKE_URL" ]; then
+              echo "Running HTTP smoke checks for $DEPLOY_TARGET"
+              for path in / /healthz /readyz; do
+                if ! curl --fail --silent --show-error --max-time 15 "$SMOKE_URL$path" >/dev/null; then
+                  echo "Smoke check failed for $SMOKE_URL$path" >&2
+                  rollback_app
+                  exit 1
+                fi
+              done
+            else
+              echo "No smoke URL configured for $DEPLOY_TARGET; container health checks passed"
+            fi
+
+            echo "Deploy complete: $DEPLOY_TARGET at $(git rev-parse HEAD)"
