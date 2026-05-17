@@ -1,0 +1,191 @@
+name: operational-web-app-prod
+
+x-prod-profile: &prod-profile
+  - prod
+
+x-api-build: &api-build
+  context: .
+  dockerfile: apps/api/Dockerfile
+
+x-api-environment: &api-environment
+  NODE_ENV: production
+  DATABASE_URL: ${DATABASE_URL}
+  DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL}
+  REDIS_URL: ${REDIS_URL}
+  BULLMQ_QUEUE_PREFIX: ${BULLMQ_QUEUE_PREFIX:-prod}
+  EXPORT_DIR: ${EXPORT_DIR:-/data/exports}
+  API_PORT: "4000"
+  CORS_ORIGINS: ${CORS_ORIGINS}
+  PUBLIC_APP_URL: ${PUBLIC_APP_URL}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+  ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-900}
+  REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-2592000}
+  MFA_KMS_KEY: ${MFA_KMS_KEY}
+  SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-brs_access}
+  SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN}
+  SESSION_COOKIE_SECURE: "true"
+  CSRF_COOKIE_NAME: ${CSRF_COOKIE_NAME:-brs_csrf}
+  CSRF_HEADER_NAME: ${CSRF_HEADER_NAME:-x-csrf-token}
+  MFA_CHALLENGE_RATE_LIMIT_POINTS: ${MFA_CHALLENGE_RATE_LIMIT_POINTS:-5}
+  MFA_CHALLENGE_RATE_LIMIT_SECONDS: ${MFA_CHALLENGE_RATE_LIMIT_SECONDS:-300}
+  MFA_CHALLENGE_MAX_FAILURES: ${MFA_CHALLENGE_MAX_FAILURES:-5}
+  SMTP_HOST: ${SMTP_HOST}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURE: ${SMTP_SECURE:-true}
+  SMTP_USER: ${SMTP_USER}
+  SMTP_PASSWORD: ${SMTP_PASSWORD}
+  SMTP_FROM: ${SMTP_FROM}
+  BILLING_ENABLED: ${BILLING_ENABLED:-true}
+  BILLING_ACTIVE_PSP: ${BILLING_ACTIVE_PSP:-midtrans}
+  MIDTRANS_ENV: ${MIDTRANS_ENV:-production}
+  MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY}
+  MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY}
+  MIDTRANS_MERCHANT_ID: ${MIDTRANS_MERCHANT_ID}
+  XENDIT_ENV: ${XENDIT_ENV:-production}
+  XENDIT_SECRET_KEY: ${XENDIT_SECRET_KEY}
+  XENDIT_PUBLIC_KEY: ${XENDIT_PUBLIC_KEY}
+  XENDIT_WEBHOOK_TOKEN: ${XENDIT_WEBHOOK_TOKEN}
+  SENTRY_DSN: ${SENTRY_DSN}
+  SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
+  SENTRY_RELEASE: ${SENTRY_RELEASE}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  PROMETHEUS_METRICS_ENABLED: ${PROMETHEUS_METRICS_ENABLED:-true}
+
+services:
+  caddy:
+    image: docker.io/library/caddy:2.8
+    profiles: *prod-profile
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+  db:
+    image: docker.io/library/postgres:16
+    profiles: *prod-profile
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+      POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER}
+      POSTGRES_ADMIN_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: docker.io/library/redis:7-alpine
+    profiles: *prod-profile
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build: *api-build
+    profiles: *prod-profile
+    restart: unless-stopped
+    command: ["node", "dist/index.js"]
+    environment: *api-environment
+    expose:
+      - "4000"
+    volumes:
+      - exports:${EXPORT_DIR:-/data/exports}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/readyz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: *api-build
+    profiles: *prod-profile
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    environment: *api-environment
+    volumes:
+      - exports:${EXPORT_DIR:-/data/exports}
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const cmd=require('fs').readFileSync('/proc/1/cmdline','utf8'); process.exit(cmd.includes('dist/worker.js') ? 0 : 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    profiles: *prod-profile
+    restart: unless-stopped
+    command: ["node", "apps/web/server.js"]
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN}
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-production}
+      NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE}
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "apps/web/healthcheck.mjs"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  caddy-data:
+  caddy-config:
+  db-data:
+  redis-data:
+  exports:
