@@ -117,65 +117,182 @@ Use this for `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY`, a
 
 ## Deploy
 
-Detailed production automation lands in P8. Until then, use this deploy checklist as the minimum standard.
+The GitHub Actions deploy workflow is the preferred path. It runs `pnpm test`, builds API/web, validates compose config, validates billing PSP readiness/fallback, runs additive migrations, restarts the compose stack, and performs `/`, `/healthz`, and `/readyz` smoke checks when a smoke URL is configured.
 
-1. Confirm the target commit and PR are merged to `main`.
-2. Pull latest code on the VPS:
+### Required GitHub environment secrets
 
-   ```bash
-   git fetch origin
-   git checkout main
-   git pull --ff-only origin main
-   ```
+Configure these in the `staging` and `prod` GitHub environments:
 
-3. Confirm required environment values exist and `.env` is not tracked by git:
+- `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_KEY`; optional `DEPLOY_PORT`.
+- Optional deploy path/file overrides: `DEPLOY_PATH` (default `/opt/brosolution`), `DEPLOY_STAGING_ENV_FILE` (default `.env.staging`), `DEPLOY_PROD_ENV_FILE` (default `.env.prod`).
+- Optional smoke URLs: `DEPLOY_STAGING_SMOKE_URL`, `DEPLOY_PROD_SMOKE_URL`.
 
-   ```bash
-   git ls-files .env
-   ```
+Pushes to `main` run the staging deploy automatically when SSH secrets exist. If staging SSH secrets are absent, the workflow records a warning and skips only the SSH deploy step. Manual workflow dispatches fail fast when SSH secrets are absent.
 
-   Expected: no output.
+### Host prerequisites
 
-4. Build and start the stack:
+On the VPS, the deploy directory must already be a clone of this repository and must contain untracked env files with real secrets:
 
-   ```bash
-   docker compose -f docker-compose.prod.yml build
-   docker compose -f docker-compose.prod.yml up -d
-   ```
+```bash
+sudo mkdir -p /opt/brosolution
+sudo chown "$USER":"$USER" /opt/brosolution
+git clone https://github.com/haniffaiq/pos-system.git /opt/brosolution
+cd /opt/brosolution
+git fetch origin
+```
 
-5. Run migrations only after reviewing migration notes and backup freshness:
+Create `.env.staging` and `.env.prod` from the checked-in examples/reference, but keep them untracked:
 
-   ```bash
-   pnpm migrate
-   ```
+```bash
+cp .env.staging.example .env.staging
+cp .env.example .env.prod
+git ls-files .env.staging .env.prod
+```
 
-6. Validate:
-   - `/healthz` returns 200.
-   - `/readyz` returns 200.
-   - Web home page loads.
-   - Platform admin can log in.
-   - One tenant-scoped read path works.
-   - Queue worker starts with no repeated errors.
-   - Billing readiness reports the admin-selected PSP and fallback PSP state correctly once P5 is implemented.
+Expected: no output. Fill all required database, Redis, SMTP, auth/session, Caddy domain, Sentry, backup, and billing values before deployment.
 
-7. Watch logs and dashboards for at least 10 minutes after deploy.
+Billing deployment guardrail: when `BILLING_ENABLED` is not `false`, `BILLING_ACTIVE_PSP` must be `midtrans` or `xendit`. The deploy script permits an incomplete active PSP only when the other provider's required runtime env is complete, so runtime can fall back safely.
+
+Auth deployment guardrail: browser auth must use HTTP-only secure cookie/session semantics after P3. Keep `SESSION_COOKIE_SECURE=true` in staging/prod, set `SESSION_COOKIE_DOMAIN` for the production domain, and do not deploy a browser flow that persists access/refresh tokens in `localStorage`.
+
+### Staging deploy
+
+Automatic path after merging to `main`:
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git push origin main
+```
+
+Manual staging redeploy of a specific ref:
+
+```bash
+gh workflow run deploy.yml -f target=staging -f ref=<sha-or-branch> -f auto_rollback=true
+gh run list --workflow deploy.yml --limit 5
+gh run watch <run-id>
+```
+
+Equivalent host commands for emergency/manual staging deploy:
+
+```bash
+cd /opt/brosolution
+git fetch --prune origin
+git checkout --detach <sha-or-origin/main>
+corepack enable
+pnpm install --frozen-lockfile
+docker compose --env-file .env.staging \
+  -f docker-compose.prod.yml -f docker-compose.staging.yml \
+  --profile prod config --quiet
+pnpm migrate
+docker compose --env-file .env.staging \
+  -f docker-compose.prod.yml -f docker-compose.staging.yml \
+  --profile prod up -d --build --remove-orphans
+curl --fail --silent --show-error --max-time 15 https://staging.brosolution.id/healthz
+curl --fail --silent --show-error --max-time 15 https://staging.brosolution.id/readyz
+```
+
+Staging validation checklist:
+
+- Web home page and `/healthz`/`/readyz` return 200.
+- Platform admin login works using HTTP-only secure cookies; browser storage does not contain access/refresh tokens.
+- One tenant-scoped read path works.
+- `docker compose ... ps` shows `api`, `web`, `worker`, `db`, `redis`, and `caddy` healthy/running.
+- Billing readiness shows the admin-selected PSP and fallback PSP state. Verify both Midtrans and Xendit sandbox configuration before selecting either provider as active.
+
+### Production deploy
+
+Production is manual through the protected `prod` GitHub environment:
+
+```bash
+gh workflow run deploy.yml -f target=prod -f ref=<sha-or-tag> -f auto_rollback=true
+gh run list --workflow deploy.yml --limit 5
+gh run watch <run-id>
+```
+
+Equivalent host commands for emergency/manual production deploy:
+
+```bash
+cd /opt/brosolution
+git fetch --prune origin
+git checkout --detach <sha-or-tag>
+corepack enable
+pnpm install --frozen-lockfile
+docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod config --quiet
+pnpm migrate
+docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod up -d --build --remove-orphans
+curl --fail --silent --show-error --max-time 15 https://brosolution.id/healthz
+curl --fail --silent --show-error --max-time 15 https://brosolution.id/readyz
+```
+
+Production validation checklist:
+
+- `/`, `/healthz`, and `/readyz` return 200 through Caddy/TLS.
+- Platform admin login works; cookies have `HttpOnly`, `Secure`, and expected `SameSite` attributes.
+- One tenant dashboard read path works and queue worker has no repeated errors.
+- Billing provider readiness is healthy for the admin-selected PSP, and the other configured PSP is either healthy or intentionally disabled with `BILLING_ENABLED=false`.
+- If billing secrets changed, run a sandbox/staging checkout and webhook replay before production, then monitor production webhook logs after deploy.
+- Watch logs and dashboards for at least 10 minutes after deploy.
+
+### Useful deploy inspection commands
+
+```bash
+cd /opt/brosolution
+docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod ps
+docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod logs --tail=200 api web worker caddy
+docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod exec -T api node -e "fetch('http://127.0.0.1:4000/readyz').then(r=>console.log(r.status))"
+```
 
 ## Rollback
 
-1. Identify the last known-good commit and image tag.
-2. Pause risky background jobs if the incident involves billing, migrations, or bulk writes.
-3. Revert app containers to the last known-good image or commit:
+Rollback reverts app containers to a known-good commit. Do not destructively roll back the database. Planned migrations are additive; failed migrations or bad data changes must be forward-fixed unless the incident commander explicitly approves a restore.
+
+### Automatic rollback during deploy
+
+The deploy workflow captures the previously deployed SHA before checkout. When `auto_rollback=true`, container restart or smoke-check failures run this rollback path automatically:
+
+```bash
+cd /opt/brosolution
+git checkout --detach <previous-deployed-sha>
+docker compose --env-file <env-file> <compose-files> --profile prod up -d --build api web worker caddy
+```
+
+Migrations are not rolled back automatically. If `pnpm migrate` fails, the workflow returns to the previous app checkout and stops before restarting the new app.
+
+### Manual app rollback
+
+1. Identify the last known-good commit from GitHub deploy runs, `git reflog`, or release notes.
+2. Pause risky background jobs if the incident involves billing, migrations, or bulk writes:
 
    ```bash
-   git checkout <last-known-good-commit>
-   docker compose -f docker-compose.prod.yml build
-   docker compose -f docker-compose.prod.yml up -d api web worker
+   cd /opt/brosolution
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod stop worker
    ```
 
-4. Do not rollback schema destructively. All planned migrations should be additive. If a new migration caused the incident, ship a forward-fix migration.
-5. Validate `/readyz`, login, tenant reads/writes, and billing webhook handling.
+3. Revert app containers to the last known-good commit:
+
+   ```bash
+   cd /opt/brosolution
+   git fetch --prune origin
+   git checkout --detach <last-known-good-sha>
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod up -d --build api web worker caddy
+   ```
+
+4. Validate health and core user paths:
+
+   ```bash
+   curl --fail --silent --show-error --max-time 15 https://brosolution.id/healthz
+   curl --fail --silent --show-error --max-time 15 https://brosolution.id/readyz
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod logs --tail=200 api web worker
+   ```
+
+5. Validate login, tenant reads/writes, billing checkout/webhook handling, and queue processing.
 6. If billing webhooks were missed during rollback, run the reconciliation job after the app is stable.
-7. Document impact, root cause, and follow-up tasks.
+7. Document impact, root cause, rollback SHA, validation results, and follow-up cards.
+
+### Database restore escalation
+
+Use restore only for confirmed corruption or data-loss scenarios with incident commander approval. Before restore, preserve the broken production database snapshot, disable workers and billing webhooks unless explicitly approved, and run billing reconciliation before re-enabling automations.
 
 ## Backup and restore
 
@@ -264,11 +381,21 @@ Run restore drills in staging or an isolated restore database only.
 3. Check health:
 
    ```bash
-   docker compose -f docker-compose.prod.yml ps
-   docker compose -f docker-compose.prod.yml logs --tail=200 api web worker
+   cd /opt/brosolution
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod ps
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod logs --tail=200 api web worker caddy
+   curl --fail --silent --show-error --max-time 15 https://brosolution.id/healthz
+   curl --fail --silent --show-error --max-time 15 https://brosolution.id/readyz
    ```
 
-4. Check `/healthz`, `/readyz`, database, Redis, queue depth, and billing provider status.
+4. Check database, Redis, queue depth, and billing provider status:
+
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod exec -T db pg_isready
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod exec -T redis redis-cli ping
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod logs --tail=200 worker | grep -Ei 'queue|bull|billing|webhook' || true
+   ```
+
 5. If billing is impacted, disable new checkout attempts if needed but keep webhook ingestion/reconciliation running when safe.
 6. If data exposure or secret leakage is suspected, preserve evidence and start secrets rotation.
 
@@ -283,7 +410,15 @@ Run restore drills in staging or an isolated restore database only.
 
 #### Billing failures
 
-1. Determine active PSP and fallback PSP readiness.
+1. Determine active PSP and fallback PSP readiness from env and logs:
+
+   ```bash
+   cd /opt/brosolution
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod exec -T api printenv \
+     BILLING_ENABLED BILLING_ACTIVE_PSP MIDTRANS_ENV XENDIT_ENV
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod logs --tail=300 api worker | grep -Ei 'billing|midtrans|xendit|webhook|fallback' || true
+   ```
+
 2. Check provider dashboard status for Midtrans and Xendit.
 3. Verify webhook signatures and recent webhook delivery attempts.
 4. If active PSP config is incomplete, switch admin-selected provider only after confirming the fallback provider is configured and healthy.
@@ -291,9 +426,19 @@ Run restore drills in staging or an isolated restore database only.
 
 #### Authentication failures
 
-1. Confirm HTTP-only session cookie issuance and cookie attributes once P3 lands.
+1. Confirm HTTP-only session cookie issuance and cookie attributes once P3 lands:
+
+   ```bash
+   curl --include --silent --show-error https://brosolution.id/login | grep -i '^set-cookie:' || true
+   ```
+
 2. Check Redis if sessions, refresh tokens, rate limits, or MFA challenges depend on it.
-3. For MFA issues, verify `MFA_KMS_KEY` and recent rotations.
+3. For MFA issues, verify `MFA_KMS_KEY` and recent rotations without printing secret values:
+
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod exec -T api sh -lc 'test -n "$MFA_KMS_KEY" && echo MFA_KMS_KEY=set || echo MFA_KMS_KEY=missing'
+   ```
+
 4. Do not reintroduce localStorage token storage as a workaround.
 
 #### Database or tenant isolation concern
