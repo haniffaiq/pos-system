@@ -37,7 +37,9 @@ Avoid older/planned aliases such as `JWT_SECRET`, `ACCESS_TTL_SEC`, `REFRESH_TTL
 | `API_PORT` | no | `4000` | API listen port; defaults to 4000. |
 | `CORS_ORIGINS` | yes | `http://localhost:3000,https://app.brosolution.id` | Comma-separated allowed web origins. |
 | `PUBLIC_APP_URL` | yes | `https://app.brosolution.id` | Public web URL used in emails and callbacks. |
-| `NEXT_PUBLIC_API_URL` | yes | `http://localhost:4000` | Browser-visible API base URL for Next.js. |
+| `NEXT_PUBLIC_API_URL` | yes | `http://localhost:4000` | Browser-visible API base URL for Next.js; leave empty in the production Caddy setup for same-origin `/api/v1` calls. |
+| `DOMAIN` | prod compose | `app.brosolution.id` | Public hostname terminated by Caddy in `docker-compose.prod.yml`. |
+| `ACME_EMAIL` | prod compose | `ops@brosolution.id` | Email Caddy passes to the ACME issuer for certificate notices. |
 
 ## Auth and session hardening
 
