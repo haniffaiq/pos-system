@@ -5,9 +5,24 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow).toBeLessThanOrEqual(1);
 }
 
+async function waitForMarketingReady(page: Page) {
+  await page.waitForLoadState("domcontentloaded");
+  await page.evaluate(() => document.fonts?.ready);
+}
+
+async function gotoMarketingHome(page: Page) {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await waitForMarketingReady(page);
+}
+
+async function reloadMarketingHome(page: Page) {
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await waitForMarketingReady(page);
+}
+
 test.describe("marketing home", () => {
   test("renders localized home page sections, nav, login menu, and CTAs", async ({ page }) => {
-    await page.goto("/", { waitUntil: "networkidle" });
+    await gotoMarketingHome(page);
 
     await expect(page).toHaveTitle(/BroSolution/);
     await expect(page.getByRole("link", { name: "Beranda BroSolution" })).toBeVisible();
@@ -41,7 +56,7 @@ test.describe("marketing home", () => {
   });
 
   test("language toggle persists English and Indonesian marketing copy", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await gotoMarketingHome(page);
 
     await expect(page.getByRole("button", { name: "ID" })).toHaveAttribute("aria-pressed", "true");
     await Promise.all([
@@ -50,7 +65,7 @@ test.describe("marketing home", () => {
     ]);
     await expect.poll(async () => (await page.context().cookies()).find((cookie) => cookie.name === "lang")?.value).toBe("en");
 
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await reloadMarketingHome(page);
     await expect(page.getByRole("heading", { name: "Run Your Wholesale Faster" })).toBeVisible();
     await expect(page.getByRole("button", { name: "EN" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("link", { name: "Start 14-Day Free Trial" }).first()).toHaveAttribute("href", "/signup");
@@ -60,12 +75,12 @@ test.describe("marketing home", () => {
       page.getByRole("button", { name: "ID" }).click(),
     ]);
     await expect.poll(async () => (await page.context().cookies()).find((cookie) => cookie.name === "lang")?.value).toBe("id");
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await reloadMarketingHome(page);
     await expect(page.getByRole("heading", { name: "Kelola Grosirmu Lebih Cepat" })).toBeVisible();
   });
 
   test("responsive marketing layout fits viewport without horizontal overflow", async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await gotoMarketingHome(page);
 
     await expect(page.getByRole("heading", { name: /Kelola Grosirmu Lebih Cepat|Run Your Wholesale Faster/ })).toBeVisible();
     await expect(page.locator("#features")).toBeVisible();
