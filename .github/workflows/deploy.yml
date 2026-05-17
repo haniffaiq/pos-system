@@ -70,7 +70,37 @@ jobs:
           pnpm --filter @app/api build
           pnpm --filter @app/web build
 
+      - name: Check deploy SSH configuration
+        id: deploy_config
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          missing=()
+          [ -n "$DEPLOY_HOST" ] || missing+=(DEPLOY_HOST)
+          [ -n "$DEPLOY_USER" ] || missing+=(DEPLOY_USER)
+          [ -n "$DEPLOY_KEY" ] || missing+=(DEPLOY_KEY)
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            printf '::warning::Skipping SSH deploy because required GitHub environment secrets are not configured: %s\n' "${missing[*]}"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require SSH configuration for manual deploys
+        if: steps.deploy_config.outputs.configured != 'true' && github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Manual deploys require DEPLOY_HOST, DEPLOY_USER, and DEPLOY_KEY environment secrets." >&2
+          exit 1
+
+      - name: Skip deploy when environment secrets are absent
+        if: steps.deploy_config.outputs.configured != 'true' && github.event_name == 'push'
+        run: |
+          echo "Staging deploy skipped: configure DEPLOY_HOST, DEPLOY_USER, and DEPLOY_KEY in the staging environment to enable automatic deploys."
+
       - name: Deploy over SSH
+        if: steps.deploy_config.outputs.configured == 'true'
         uses: appleboy/ssh-action@v1.0.3
         env:
           DEPLOY_TARGET: ${{ env.DEPLOY_TARGET }}

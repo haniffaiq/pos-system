@@ -30,6 +30,9 @@ jobs:
               'Migration failed. Database rollback is intentionally not attempted',
               'rollback_app',
               'BILLING_ACTIVE_PSP',
+              'Check deploy SSH configuration',
+              "steps.deploy_config.outputs.configured == 'true'",
+              'Manual deploys require DEPLOY_HOST, DEPLOY_USER, and DEPLOY_KEY',
           ]
           missing = [needle for needle in required if needle not in deploy]
           if missing:
