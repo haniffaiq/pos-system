@@ -1,0 +1,63 @@
+name: operational-web-app-staging
+
+services:
+  caddy:
+    environment:
+      DOMAIN: ${STAGING_DOMAIN}
+      ACME_EMAIL: ${STAGING_ACME_EMAIL}
+    volumes:
+      - ./infra/caddy/Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - caddy-staging-data:/data
+      - caddy-staging-config:/config
+
+  db:
+    volumes:
+      - db-staging-data:/var/lib/postgresql/data
+
+  redis:
+    volumes:
+      - redis-staging-data:/data
+
+  api:
+    environment:
+      NODE_ENV: production
+      APP_ENV: staging
+      BULLMQ_QUEUE_PREFIX: ${BULLMQ_QUEUE_PREFIX:-staging}
+      SESSION_COOKIE_SECURE: "true"
+      BILLING_ENABLED: ${BILLING_ENABLED:-true}
+      BILLING_ACTIVE_PSP: ${BILLING_ACTIVE_PSP:-midtrans}
+      MIDTRANS_ENV: ${MIDTRANS_ENV:-sandbox}
+      XENDIT_ENV: ${XENDIT_ENV:-sandbox}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-staging}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PROMETHEUS_METRICS_ENABLED: ${PROMETHEUS_METRICS_ENABLED:-true}
+    volumes:
+      - exports-staging:${EXPORT_DIR:-/data/exports}
+
+  worker:
+    environment:
+      NODE_ENV: production
+      APP_ENV: staging
+      BULLMQ_QUEUE_PREFIX: ${BULLMQ_QUEUE_PREFIX:-staging}
+      SESSION_COOKIE_SECURE: "true"
+      BILLING_ENABLED: ${BILLING_ENABLED:-true}
+      BILLING_ACTIVE_PSP: ${BILLING_ACTIVE_PSP:-midtrans}
+      MIDTRANS_ENV: ${MIDTRANS_ENV:-sandbox}
+      XENDIT_ENV: ${XENDIT_ENV:-sandbox}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-staging}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PROMETHEUS_METRICS_ENABLED: ${PROMETHEUS_METRICS_ENABLED:-true}
+    volumes:
+      - exports-staging:${EXPORT_DIR:-/data/exports}
+
+  web:
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-staging}
+
+volumes:
+  caddy-staging-data:
+  caddy-staging-config:
+  db-staging-data:
+  redis-staging-data:
+  exports-staging:
