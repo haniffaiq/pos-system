@@ -6,7 +6,42 @@ on:
   pull_request:
 
 jobs:
+  deploy-workflow-guardrails:
+    name: validate deploy workflow guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate deploy workflow guardrails
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          deploy = Path('.github/workflows/deploy.yml').read_text()
+          required = [
+              'secrets.DEPLOY_HOST',
+              'secrets.DEPLOY_USER',
+              'secrets.DEPLOY_KEY',
+              'environment:',
+              'concurrency:',
+              'git ls-files --error-unmatch "$ENV_FILE"',
+              'compose config --quiet',
+              'Migration failed. Database rollback is intentionally not attempted',
+              'rollback_app',
+              'BILLING_ACTIVE_PSP',
+          ]
+          missing = [needle for needle in required if needle not in deploy]
+          if missing:
+              raise SystemExit(f'deploy.yml missing guardrails: {missing}')
+          forbidden = ['DEPLOY_PASSWORD', 'export $(grep', 'set -x']
+          present = [needle for needle in forbidden if needle in deploy]
+          if present:
+              raise SystemExit(f'deploy.yml contains unsafe patterns: {present}')
+          PY
+
   verify:
+    needs: deploy-workflow-guardrails
     name: verify build, tests, and Playwright
     runs-on: ubuntu-latest
     timeout-minutes: 30
