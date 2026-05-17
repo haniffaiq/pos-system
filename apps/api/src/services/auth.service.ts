@@ -194,7 +194,7 @@ export async function loginTenantUser(slug: string, email: string, password: str
   const identity: TenantIdentity = {
     user: { id: row.id, tenantId: row.tenant_id, email: row.email, name: row.name, role: row.role },
   };
-  const requiresMfa = row.role === "owner" || row.totp_enabled === true;
+  const requiresMfa = row.totp_enabled === true;
   if (requiresMfa && !hasMfaBypass(row.email)) {
     return mfaRequired({
       payload,
@@ -229,6 +229,9 @@ export async function loginPlatformAdmin(email: string, password: string): Promi
   const payload: JwtPayload = { sub: row.id, tenantId: null, role: "platform_admin" };
   const identity: AdminIdentity = { admin: { id: row.id, email: row.email, name: row.name } };
   if (hasMfaBypass(row.email)) {
+    return authenticated(payload, identity);
+  }
+  if (row.totp_enabled !== true) {
     return authenticated(payload, identity);
   }
 

@@ -59,6 +59,8 @@ services:
   api:
     build: *api-build
     command: pnpm exec tsx src/index.ts
+    env_file:
+      - .env
     environment: *app-environment
     ports:
       - "${API_PORT}:4000"
@@ -78,6 +80,8 @@ services:
   worker:
     build: *api-build
     command: pnpm exec tsx src/worker.ts
+    env_file:
+      - .env
     environment: *app-environment
     volumes:
       - exports:${EXPORT_DIR}

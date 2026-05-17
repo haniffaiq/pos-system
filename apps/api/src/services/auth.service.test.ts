@@ -115,10 +115,10 @@ describeWithAuthInfra("auth.service", () => {
     expect(result.user.tenantId).toBeTruthy();
   });
 
-  it("returns MFA_REQUIRED for privileged and TOTP-enabled users, then issues tokens after valid TOTP", async () => {
+  it("returns MFA_REQUIRED for TOTP-enrolled users, then issues tokens after valid TOTP", async () => {
     const owner = await loginTenantUser(tenantSlug, ownerEmail, "secret12");
-    expect(owner).toMatchObject({ type: "mfa_required", methods: ["email_otp"] });
-    if (owner.type === "mfa_required") challengeTokens.add(owner.challengeToken);
+    if (owner.type !== "authenticated" || !("user" in owner)) throw new Error("expected owner authenticated without MFA");
+    refreshSubjects.add(owner.user.id);
 
     const challenged = await loginTenantUser(tenantSlug, totpUserEmail, "secret12");
     expect(challenged).toMatchObject({ type: "mfa_required", methods: ["totp", "email_otp"] });
@@ -158,11 +158,12 @@ describeWithAuthInfra("auth.service", () => {
     } satisfies Partial<AppError>);
   });
 
-  it("requires MFA for platform admins", async () => {
+  it("does not require MFA for platform admins without TOTP enrollment", async () => {
     const result = await loginPlatformAdmin(platformAdminEmail, "admin123");
 
-    expect(result).toMatchObject({ type: "mfa_required", methods: ["email_otp"] });
-    if (result.type === "mfa_required") challengeTokens.add(result.challengeToken);
+    if (result.type !== "authenticated" || !("admin" in result)) throw new Error("expected authenticated admin without MFA");
+    expect(result.accessToken).toBeTruthy();
+    expect(result.refreshToken).toBeTruthy();
   });
 
   it("refresh rotates the token and logout invalidates the current refresh token", async () => {
