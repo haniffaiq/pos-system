@@ -7,7 +7,6 @@ x-api-build: &api-build
 x-app-environment: &app-environment
   NODE_ENV: development
   DATABASE_URL: ${DATABASE_URL}
-  DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL}
   REDIS_URL: ${REDIS_URL}
   JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
   JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}

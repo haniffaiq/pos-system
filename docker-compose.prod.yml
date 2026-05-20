@@ -10,7 +10,6 @@ x-api-build: &api-build
 x-api-environment: &api-environment
   NODE_ENV: production
   DATABASE_URL: ${DATABASE_URL}
-  DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL}
   REDIS_URL: ${REDIS_URL}
   APP_NAMESPACE: ${APP_NAMESPACE}
   EXPORT_DIR: ${EXPORT_DIR:-/data/exports}
