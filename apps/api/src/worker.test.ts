@@ -37,6 +37,8 @@ vi.mock("bullmq", () => ({
 
 vi.mock("./lib/redis", () => ({
   redis: { status: "ready" },
+  bullConnection: { status: "ready" },
+  appNamespace: "test",
 }));
 
 vi.mock("./lib/logger", () => ({
