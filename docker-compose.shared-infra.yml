@@ -1,0 +1,106 @@
+name: postyb-prod
+
+# pos.thankyoubro.id app stack running against the shared `infa-basic` infra.
+#
+# Postgres, Redis and MinIO are NOT defined here — they are owned by the
+# infa-basic project, which also owns the `shared-infra` Docker network. This
+# stack joins that network as an external network and reaches the backing
+# services through their `postgres` / `redis` / `minio` network aliases.
+#
+# TLS is terminated by the host nginx reverse proxy (pos.thankyoubro.id), so
+# this stack has NO caddy service — it only publishes web/api on loopback
+# ports. All connection strings and credentials come from .env (env_file).
+#
+# Select this file with:
+#   docker compose -f docker-compose.shared-infra.yml --env-file .env up -d --build
+
+networks:
+  shared-infra:
+    external: true
+
+volumes:
+  exports:
+
+x-app-build: &api-build
+  context: .
+  dockerfile: apps/api/Dockerfile
+
+services:
+  api:
+    build: *api-build
+    restart: unless-stopped
+    # The compiled `dist/` output uses extensionless ESM relative imports
+    # (e.g. `./db/pool`), which plain `node` cannot resolve under
+    # "type": "module". The repo's working runtime is tsx (its dev command),
+    # so run the TypeScript sources directly via tsx in production too.
+    command: ["pnpm", "exec", "tsx", "src/index.ts"]
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      API_PORT: "4000"
+    expose:
+      - "4000"
+    volumes:
+      - exports:${EXPORT_DIR:-/data/exports}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/readyz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-4200}:4000"
+    networks:
+      - shared-infra
+    logging: &json-logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  worker:
+    build: *api-build
+    restart: unless-stopped
+    command: ["pnpm", "exec", "tsx", "src/worker.ts"]
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+    volumes:
+      - exports:${EXPORT_DIR:-/data/exports}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - shared-infra
+    logging: *json-logging
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    command: ["node", "apps/web/server.js"]
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "apps/web/healthcheck.mjs"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEB_HOST_PORT:-3200}:3000"
+    networks:
+      - shared-infra
+    logging: *json-logging
