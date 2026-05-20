@@ -3,9 +3,8 @@ import { adminPool, tenantPool } from "./pool";
 import { withAdmin, withTenant } from "./withTenant";
 
 const databaseUrl = process.env.DATABASE_URL;
-const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
 
-const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
+const describeWithDatabase = databaseUrl ? describe : describe.skip;
 
 describeWithDatabase("withTenant", () => {
   afterAll(async () => {
