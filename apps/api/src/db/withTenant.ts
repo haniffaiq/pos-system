@@ -44,7 +44,7 @@ export async function withTenant<T>(
   });
 }
 
-/** Run a callback against the BYPASSRLS admin pool (platform-level queries). */
+/** Run a callback against the platform-mode admin pool (app.platform_mode=on; bypasses RLS policies). */
 export async function withAdmin<T>(fn: (q: Query) => Promise<T>): Promise<T> {
   return withTransaction(adminPool, async (_client, q) => fn(q));
 }

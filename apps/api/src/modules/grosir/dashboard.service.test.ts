@@ -7,9 +7,8 @@ import { recordMovement } from "./stock";
 import { getDashboard } from "./dashboard.service";
 
 const databaseUrl = process.env.DATABASE_URL;
-const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
 
-const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
+const describeWithDatabase = databaseUrl ? describe : describe.skip;
 
 interface DashboardFixture {
   tenantId: string;

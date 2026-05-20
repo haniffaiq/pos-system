@@ -5,9 +5,8 @@ import { withAdmin } from "../../db/withTenant";
 import { createStockIn, listStockIn } from "./stockin.service";
 
 const databaseUrl = process.env.DATABASE_URL;
-const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
 
-const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
+const describeWithDatabase = databaseUrl ? describe : describe.skip;
 
 interface StockInFixture {
   tenantId: string;

@@ -20,9 +20,8 @@ vi.mock("../queue/queues", async (importOriginal) => {
 });
 
 const databaseUrl = process.env.DATABASE_URL;
-const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
 
-const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
+const describeWithDatabase = databaseUrl ? describe : describe.skip;
 
 describeWithDatabase("tenant.service", () => {
   beforeEach(() => {
