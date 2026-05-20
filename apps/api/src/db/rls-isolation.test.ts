@@ -3,9 +3,8 @@ import { adminPool, tenantPool } from "./pool";
 import { withTenant } from "./withTenant";
 
 const databaseUrl = process.env.DATABASE_URL;
-const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
 
-const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
+const describeWithDatabase = databaseUrl ? describe : describe.skip;
 
 let tenantA: string;
 let tenantB: string;

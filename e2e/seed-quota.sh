@@ -6,8 +6,8 @@ RUN_ID="$(date +%s)-${RANDOM:-0}"
 FREE_SLUG="${E2E_QUOTA_FREE_SLUG:-quota-free-${RUN_ID}}"
 INACTIVE_SLUG="${E2E_QUOTA_INACTIVE_SLUG:-quota-inactive-${RUN_ID}}"
 
-if [ -z "${DATABASE_ADMIN_URL:-}" ]; then
-  echo "DATABASE_ADMIN_URL is required to seed quota e2e tenants" >&2
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "DATABASE_URL is required to seed quota e2e tenants" >&2
   exit 1
 fi
 
@@ -17,7 +17,7 @@ PASSWORD_HASH=$(node -e 'const argon2 = require("argon2"); argon2.hash(process.a
 # subscriptions with the exact states required by the Playwright gate.
 pnpm seed:plans >/dev/null
 
-psql "$DATABASE_ADMIN_URL" --set ON_ERROR_STOP=1 \
+PGOPTIONS='-c app.platform_mode=on' psql "$DATABASE_URL" --set ON_ERROR_STOP=1 \
   --set free_slug="$FREE_SLUG" \
   --set inactive_slug="$INACTIVE_SLUG" \
   --set password_hash="$PASSWORD_HASH" <<'SQL' >/dev/null

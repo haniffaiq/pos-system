@@ -19,5 +19,3 @@ create index if not exists idx_signup_tokens_email_active
   on signup_tokens(lower(email), expires_at)
   where consumed_at is null;
 
-grant select, insert, update, delete on signup_tokens to app;
-grant all on signup_tokens to app_admin;

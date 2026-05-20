@@ -2,9 +2,8 @@ import { afterAll, describe, expect, it } from "vitest";
 import { adminPool, tenantPool } from "./pool";
 
 const databaseUrl = process.env.DATABASE_URL;
-const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
 
-const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
+const describeWithDatabase = databaseUrl ? describe : describe.skip;
 
 describeWithDatabase("db pools", () => {
   afterAll(async () => {
@@ -17,9 +16,11 @@ describeWithDatabase("db pools", () => {
     expect(rows[0]?.ok).toBe(1);
   });
 
-  it("connects with the admin role", async () => {
-    const { rows } = await adminPool.query<{ ok: number }>("select 1 as ok");
+  it("connects through the admin pool in platform mode", async () => {
+    const { rows } = await adminPool.query<{ mode: string | null }>(
+      "select current_setting('app.platform_mode', true) as mode",
+    );
 
-    expect(rows[0]?.ok).toBe(1);
+    expect(rows[0]?.mode).toBe("on");
   });
 });

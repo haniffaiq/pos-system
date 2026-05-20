@@ -3,9 +3,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 const describeWithRedis = process.env.REDIS_URL ? describe : describe.skip;
 
 const queuePrefix = `test-${process.pid}-${Date.now()}`;
-process.env.BULLMQ_QUEUE_PREFIX = queuePrefix;
+process.env.APP_NAMESPACE = queuePrefix;
 
 let redis: typeof import("../lib/redis")["redis"];
+let bullConnection: typeof import("../lib/redis")["bullConnection"];
 let provisioningQueue: typeof import("./queues")["provisioningQueue"];
 let emailQueue: typeof import("./queues")["emailQueue"];
 let lowStockScanQueue: typeof import("./queues")["lowStockScanQueue"];
@@ -19,23 +20,23 @@ let WORKER_QUEUE_NAMES: typeof import("../worker")["WORKER_QUEUE_NAMES"];
 const queueKeyPattern = `${queuePrefix}:*`;
 
 async function cleanupQueueKeys(): Promise<void> {
-  if (!redis) {
+  if (!bullConnection) {
     return;
   }
 
   let cursor = "0";
   do {
-    const [nextCursor, keys] = await redis.scan(cursor, "MATCH", queueKeyPattern, "COUNT", 100);
+    const [nextCursor, keys] = await bullConnection.scan(cursor, "MATCH", queueKeyPattern, "COUNT", 100);
     cursor = nextCursor;
     if (keys.length > 0) {
-      await redis.del(...keys);
+      await bullConnection.del(...keys);
     }
   } while (cursor !== "0");
 }
 
 describeWithRedis("queues", () => {
   beforeAll(async () => {
-    ({ redis } = await import("../lib/redis"));
+    ({ redis, bullConnection } = await import("../lib/redis"));
     ({
       provisioningQueue,
       emailQueue,
@@ -69,7 +70,9 @@ describeWithRedis("queues", () => {
     await dunningQueue?.close();
     await purgeRefreshBlacklistQueue?.close();
     await cleanupQueueKeys();
+    // Importing ../lib/redis opens both clients; quit them so Vitest workers exit cleanly.
     await redis?.quit();
+    await bullConnection?.quit();
   });
 
   it("uses stable queue names that match worker registration", () => {

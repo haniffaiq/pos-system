@@ -26,17 +26,19 @@ describe("004 auth hardening migration", () => {
     expect(migration).toContain("primary key (admin_id, method)");
   });
 
-  it("enables self-scoped RLS and grants app access for MFA tables", () => {
+  it("enables forced self-scoped RLS for MFA tables without role grants", () => {
     const migration = sql();
 
     expect(migration).toContain("alter table user_mfa enable row level security");
+    expect(migration).toContain("alter table user_mfa force row level security");
     expect(migration).toContain("create policy user_mfa_self on user_mfa");
     expect(migration).toContain("user_id = nullif(current_setting('app.current_user_id', true), '')::uuid");
     expect(migration).toContain("alter table platform_admin_mfa enable row level security");
+    expect(migration).toContain("alter table platform_admin_mfa force row level security");
     expect(migration).toContain("create policy platform_admin_mfa_self on platform_admin_mfa");
     expect(migration).toContain("admin_id = nullif(current_setting('app.current_admin_id', true), '')::uuid");
-    expect(migration).toContain("grant select, insert, update, delete on user_mfa to app");
-    expect(migration).toContain("grant select, insert, update, delete on platform_admin_mfa to app");
+    expect(migration).toContain("current_setting('app.platform_mode', true) = 'on'");
+    expect(migration).not.toContain("to app");
   });
 
   it("creates a durable refresh token blacklist for cookie logout revocation", () => {

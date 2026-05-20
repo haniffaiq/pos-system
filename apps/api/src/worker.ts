@@ -1,6 +1,6 @@
 import { Worker, type Job, type Processor, type WorkerOptions } from "bullmq";
 
-import { redis } from "./lib/redis";
+import { bullConnection, appNamespace } from "./lib/redis";
 import { logger, toLogError } from "./lib/logger";
 import { recordQueueJob } from "./middleware/metrics";
 import { emailProcessor } from "./queue/jobs/email";
@@ -28,8 +28,8 @@ import {
 export const WORKER_QUEUE_NAMES = QUEUE_NAMES;
 
 const workerOptions: WorkerOptions = {
-  connection: redis,
-  prefix: process.env.BULLMQ_QUEUE_PREFIX,
+  connection: bullConnection,
+  prefix: appNamespace,
 };
 
 const exportGenerationProcessor: Processor<ExportGenerationJob> = exportProcessor;

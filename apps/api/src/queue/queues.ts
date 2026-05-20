@@ -1,6 +1,6 @@
 import { Queue, type JobsOptions } from "bullmq";
 
-import { redis } from "../lib/redis";
+import { bullConnection, appNamespace } from "../lib/redis";
 
 export const QUEUE_NAMES = [
   "provisioning",
@@ -59,9 +59,9 @@ export const DEFAULT_JOB_OPTIONS: JobsOptions = {
 };
 
 const queueOptions = {
-  connection: redis,
+  connection: bullConnection,
   defaultJobOptions: DEFAULT_JOB_OPTIONS,
-  prefix: process.env.BULLMQ_QUEUE_PREFIX,
+  prefix: appNamespace,
 };
 
 const redisBackedQueuesDisabled = process.env.NODE_ENV === "test" && !process.env.REDIS_URL;

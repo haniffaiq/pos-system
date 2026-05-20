@@ -17,6 +17,8 @@ vi.mock("./db/pool", () => ({
 
 vi.mock("./lib/redis", () => ({
   redis: { ping: mocks.redisPing },
+  bullConnection: {},
+  appNamespace: "test",
 }));
 
 vi.mock("./lib/logger", () => ({

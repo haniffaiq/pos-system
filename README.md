@@ -14,10 +14,13 @@ BroSolution Operational Grosir is a multi-tenant SaaS starter for wholesale oper
 ```bash
 pnpm install
 cp .env.example .env
+# Fill in DATABASE_URL, REDIS_URL, APP_NAMESPACE, SHARED_NETWORK, and MINIO_* with
+# credentials supplied by the instance owner, then ensure the external network exists:
+docker network create "$(grep SHARED_NETWORK .env | cut -d= -f2)"
 pnpm dev
 ```
 
-`pnpm dev` runs the Docker Compose dev profile. In another terminal, initialize the database and platform admin:
+`pnpm dev` runs the Docker Compose dev profile (app containers only — Postgres and Redis are provided by the shared external instance). In another terminal, initialize the database and platform admin:
 
 ```bash
 pnpm migrate
@@ -32,17 +35,19 @@ Open:
 
 ## Environment setup
 
-Start from `.env.example` and fill local-only values in `.env`. Keep `.env` out of git.
+Start from `.env.example` and fill in the credentials supplied by the instance owner. Keep `.env` out of git.
 
 Core groups:
 
-- Database: `POSTGRES_*`, `DATABASE_URL`, `DATABASE_ADMIN_URL`
-- Redis/worker: `REDIS_URL`, `EXPORT_DIR`
+- Database: `DATABASE_URL` (single connection string to the shared Postgres instance)
+- Redis/worker: `REDIS_URL` (includes credentials and DB index, e.g. `redis://user:pw@redis:6379/0`), `APP_NAMESPACE` (key prefix, queue prefix, and backup prefix)
+- Networking: `SHARED_NETWORK` (name of the external Docker network; must be pre-created before `docker compose up`)
+- Backup: `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`
 - Auth: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, token TTL values
 - Email: `SMTP_*`, `MAIL_FROM`, `MAILHOG_WEB_PORT`
 - Web/API: `API_PORT`, `WEB_PORT`, `NEXT_PUBLIC_API_URL`, `CORS_ORIGINS`
 
-Roadmap work adds a fuller env reference in `docs/env-reference.md`. Billing must support both Midtrans and Xendit: admins select the active PSP, and runtime code must fall back to the other configured provider when the active provider config is incomplete.
+See `docs/env-reference.md` for the full variable reference. Billing must support both Midtrans and Xendit: admins select the active PSP, and runtime code must fall back to the other configured provider when the active provider config is incomplete.
 
 ## Tests
 
@@ -62,14 +67,25 @@ pnpm --filter @app/web test
 
 ## Docker notes
 
-The default `docker-compose.yml` is for local development:
+The default `docker-compose.yml` is for local development. Postgres and Redis are **not** bundled — they are provided by the shared external instance. Before starting the app stack, ensure the external Docker network exists:
 
 ```bash
-docker compose --profile dev up -d db redis mailhog
+docker network create "$(grep SHARED_NETWORK .env | cut -d= -f2)"
+```
+
+Then start the app containers:
+
+```bash
 docker compose --profile dev up --build api worker web
 ```
 
-Ports are controlled by `.env`: API `4000`, web `3000`, Postgres host port `5433`, Redis host port `6380`, and MailHog UI `8025` by default.
+For local email, start the MailHog sidecar separately if needed:
+
+```bash
+docker compose --profile dev up -d mailhog
+```
+
+Ports are controlled by `.env`: API `4000`, web `3000`, and MailHog UI `8025` by default.
 
 ## Security roadmap notes
 

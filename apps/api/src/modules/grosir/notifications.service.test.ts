@@ -6,9 +6,8 @@ import { AppError } from "../../lib/errors";
 import { createNotification, listNotifications, markRead } from "./notifications.service";
 
 const databaseUrl = process.env.DATABASE_URL;
-const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
 
-const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
+const describeWithDatabase = databaseUrl ? describe : describe.skip;
 
 async function createTenant(slugPrefix: string): Promise<string> {
   const suffix = crypto.randomUUID().slice(0, 8);

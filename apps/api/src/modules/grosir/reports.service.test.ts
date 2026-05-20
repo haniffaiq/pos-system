@@ -11,8 +11,7 @@ import { recordMovement } from "./stock";
 import { getExportDownload, requestExport, salesReport, stockReport } from "./reports.service";
 
 const databaseUrl = process.env.DATABASE_URL;
-const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
-const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
+const describeWithDatabase = databaseUrl ? describe : describe.skip;
 
 interface ReportsFixture {
   tenantId: string;

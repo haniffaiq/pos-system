@@ -28,11 +28,10 @@ describe("005 signup tokens migration", () => {
     expect(migration).toContain("where consumed_at is null");
   });
 
-  it("grants app access without tenant RLS because signup runs before authentication", () => {
+  it("has no role grants and no tenant RLS because signup runs before authentication", () => {
     const migration = sql();
 
-    expect(migration).toContain("grant select, insert, update, delete on signup_tokens to app");
-    expect(migration).toContain("grant all on signup_tokens to app_admin");
+    expect(migration).not.toContain("to app");
     expect(migration).not.toContain("enable row level security");
   });
 });

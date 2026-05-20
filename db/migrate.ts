@@ -5,7 +5,10 @@ import { Pool } from "pg";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const dir = join(currentDir, "migrations");
-const pool = new Pool({ connectionString: process.env.DATABASE_ADMIN_URL });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  options: "-c app.platform_mode=on",
+});
 
 async function run() {
   await pool.query(

@@ -14,7 +14,7 @@ import { redis } from "../lib/redis";
 import { loginPlatformAdmin, loginTenantUser, logout, refresh, verifyMfaChallenge } from "./auth.service";
 import { generateCurrentTotp } from "./mfa.service";
 
-const hasAuthInfra = Boolean(process.env.DATABASE_URL && process.env.DATABASE_ADMIN_URL && process.env.REDIS_URL);
+const hasAuthInfra = Boolean(process.env.DATABASE_URL && process.env.REDIS_URL);
 const describeWithAuthInfra = hasAuthInfra ? describe : describe.skip;
 const testNamespace = `auth-${process.pid}-${Date.now()}`;
 const refreshSubjects = new Set<string>();

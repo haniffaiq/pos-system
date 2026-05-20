@@ -78,7 +78,6 @@ jobs:
           - 8025:8025
     env:
       DATABASE_URL: postgres://app:app_password@localhost:5432/operational
-      DATABASE_ADMIN_URL: postgres://app_admin:admin_password@localhost:5432/operational
       REDIS_URL: redis://localhost:6379
       JWT_ACCESS_SECRET: ci_access_secret_at_least_32_characters_long
       JWT_REFRESH_SECRET: ci_refresh_secret_at_least_32_characters_long
@@ -96,7 +95,7 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:4000
       PLAYWRIGHT_BASE_URL: http://localhost:3000
       EXPORT_DIR: /tmp/pos-exports
-      BULLMQ_QUEUE_PREFIX: ci-${{ github.run_id }}-${{ github.run_attempt }}
+      APP_NAMESPACE: ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -128,21 +127,15 @@ jobs:
           DO $$
           BEGIN
             IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app') THEN
-              CREATE ROLE app LOGIN PASSWORD 'app_password' NOBYPASSRLS;
-            END IF;
-            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_admin') THEN
-              CREATE ROLE app_admin LOGIN PASSWORD 'admin_password' BYPASSRLS;
+              CREATE ROLE app LOGIN PASSWORD 'app_password' NOSUPERUSER NOBYPASSRLS;
             END IF;
           END
           $$;
-          ALTER ROLE app WITH LOGIN PASSWORD 'app_password' NOBYPASSRLS;
-          ALTER ROLE app_admin WITH LOGIN PASSWORD 'admin_password' BYPASSRLS;
-          ALTER DATABASE operational OWNER TO app_admin;
-          ALTER SCHEMA public OWNER TO app_admin;
-          GRANT CONNECT ON DATABASE operational TO app;
-          GRANT USAGE ON SCHEMA public TO app;
-          GRANT ALL PRIVILEGES ON DATABASE operational TO app_admin;
-          GRANT ALL PRIVILEGES ON SCHEMA public TO app_admin;
+          ALTER ROLE app WITH LOGIN PASSWORD 'app_password' NOSUPERUSER NOBYPASSRLS;
+          ALTER DATABASE operational OWNER TO app;
+          ALTER SCHEMA public OWNER TO app;
+          GRANT ALL PRIVILEGES ON DATABASE operational TO app;
+          GRANT ALL PRIVILEGES ON SCHEMA public TO app;
           SQL
 
       - name: Run database migrations

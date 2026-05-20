@@ -17,17 +17,14 @@ Avoid older/planned aliases such as `JWT_SECRET`, `ACCESS_TTL_SEC`, `REFRESH_TTL
 
 | Key | Required | Example | Notes |
 |---|---:|---|---|
-| `POSTGRES_DB` | dev compose | `operational` | Local Docker Compose database name. |
-| `POSTGRES_USER` | dev compose | `postgres` | Local superuser for bootstrap only. |
-| `POSTGRES_PASSWORD` | dev compose | `change_me_postgres_password` | Local placeholder; do not commit real values. |
-| `POSTGRES_APP_USER` | dev compose | `app` | Runtime app role. |
-| `POSTGRES_APP_PASSWORD` | dev compose | `change_me_app_password` | Used to build local app connection strings. |
-| `POSTGRES_ADMIN_USER` | dev compose | `app_admin` | Migration/admin role. |
-| `POSTGRES_ADMIN_PASSWORD` | dev compose | `change_me_admin_password` | Used to build local admin connection strings. |
-| `DATABASE_URL` | yes | `postgres://app:***@db:5432/operational` | App-role Postgres connection. |
-| `DATABASE_ADMIN_URL` | yes | `postgres://app_admin:***@db:5432/operational` | Admin/migration Postgres connection. |
-| `REDIS_URL` | yes | `redis://redis:6379` | Redis for queues, cache, rate limits, and future sessions. |
-| `BULLMQ_QUEUE_PREFIX` | no | `brosolution` | Optional queue namespace. |
+| `DATABASE_URL` | yes | `postgresql://user:pw@postgres:5432/db` | Single connection string to the shared Postgres instance. The database and owning role are provisioned by the instance owner; this app connects as that role. Used for all app queries and migrations. |
+| `REDIS_URL` | yes | `redis://user:pw@redis:6379/0` | Redis connection string including credentials and DB index. The shared Redis instance enforces an ACL restricting this app's keys to the `<APP_NAMESPACE>:*` prefix. |
+| `APP_NAMESPACE` | yes | `brosolution` | Per-app namespace. Used as the Redis key prefix, the BullMQ queue prefix, and the backup object-name prefix. Must match the prefix the shared Redis ACL enforces for this app. |
+| `SHARED_NETWORK` | yes | `infra_shared` | Name of the external Docker network the `api`, `worker`, and `web` containers join. This network must be pre-created by the instance owner (`docker network create <name>`) before `docker compose up`; otherwise Compose fails with a "network declared as external, but could not be found" error. Provides hostname resolution for `postgres`, `redis`, and `minio`. |
+| `MINIO_ENDPOINT` | prod/P8 | `https://minio.example.com` | S3-compatible MinIO endpoint for backups. Provisioned by the instance owner. |
+| `MINIO_ACCESS_KEY` | prod/P8 | `change_me_minio_access_key` | Access key for the shared MinIO instance. |
+| `MINIO_SECRET_KEY` | prod/P8 | `change_me_minio_secret_key` | Secret key for the shared MinIO instance. |
+| `MINIO_BUCKET` | prod/P8 | `brosolution-backups` | MinIO bucket for backup artifacts. The bucket is provisioned by the instance owner. |
 | `EXPORT_DIR` | no | `/data/exports` | Filesystem export root used by reports/export jobs. |
 
 ## API and web runtime
@@ -114,15 +111,11 @@ Run the observability stack with the app compose file so Prometheus can scrape `
 
 ## Backup (P8)
 
+Backup target is the shared MinIO instance. `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, and `MINIO_BUCKET` are documented under "Core database, Redis, and queues" above because they are part of the shared-infrastructure configuration block. The backup script reads those vars directly (with a legacy fallback to `BACKUP_S3_*` for any existing override).
+
 | Key | Required | Example | Notes |
 |---|---:|---|---|
-| `BACKUP_S3_ENDPOINT` | prod/P8 | `https://s3.amazonaws.com` | S3-compatible endpoint (AWS S3, R2, Wasabi, Spaces). |
-| `BACKUP_S3_BUCKET` | prod/P8 | `brosolution-backups` | Backup bucket name. |
-| `BACKUP_S3_REGION` | prod/P8 | `ap-southeast-1` | Region or provider-specific placeholder. |
-| `BACKUP_S3_ACCESS_KEY` | prod/P8 | `change_me_backup_access_key` | Least-privilege write/read key for backup prefix. |
-| `BACKUP_S3_SECRET_KEY` | prod/P8 | `change_me_backup_secret_key` | Matching secret key. |
-| `BACKUP_S3_PREFIX` | no | `prod/` | Optional object prefix. |
-| `BACKUP_RETENTION_DAYS` | no | `30` | Planned retention policy for backup automation. |
+| `BACKUP_RETENTION_DAYS` | no | `30` | Planned retention window in days for backup automation. Set `0` or unset to disable script-side pruning if bucket lifecycle policies own retention. |
 
 ## E2E and CI helpers
 

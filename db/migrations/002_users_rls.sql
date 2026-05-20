@@ -1,26 +1,7 @@
--- DB roles. app_admin bypasses RLS for platform queries.
--- Fresh compose databases create app_admin in db/init before migrations so the
--- migration runner can connect as app_admin without needing superuser-only role
--- changes. When a superuser/owner runs this migration directly, keep the role
--- bootstrap path idempotent for older local databases.
-do $$ begin
-  if current_user <> 'app_admin' then
-    if not exists (select from pg_roles where rolname = 'app') then
-      create role app login password 'app_dev_pw' nobypassrls;
-    end if;
-
-    if not exists (select from pg_roles where rolname = 'app_admin') then
-      create role app_admin login password 'admin_dev_pw' bypassrls;
-    end if;
-
-    alter role app with login password 'app_dev_pw' nobypassrls;
-    alter role app_admin with login password 'admin_dev_pw' bypassrls;
-  end if;
-end $$;
-
-grant all on all tables in schema public to app_admin;
-alter default privileges in schema public grant all on tables to app_admin;
-
+-- Tenant-scoped users table protected by RLS. The shared-instance owner
+-- provisions the database, role, and object ownership; this migration defines
+-- only schema and policy. Platform queries bypass RLS via the app.platform_mode
+-- session GUC (set as a connection option on the admin pool).
 create table users (
   id            uuid primary key default uuid_v7(),
   tenant_id     uuid not null references tenants(id) on delete cascade,
@@ -34,9 +15,14 @@ create table users (
 );
 
 alter table users enable row level security;
+alter table users force row level security;
 
 create policy users_tenant_isolation on users
-  using (tenant_id = nullif(current_setting('app.current_tenant_id', true), '')::uuid)
-  with check (tenant_id = nullif(current_setting('app.current_tenant_id', true), '')::uuid);
-
-grant select, insert, update, delete on users to app;
+  using (
+    current_setting('app.platform_mode', true) = 'on'
+    or tenant_id = nullif(current_setting('app.current_tenant_id', true), '')::uuid
+  )
+  with check (
+    current_setting('app.platform_mode', true) = 'on'
+    or tenant_id = nullif(current_setting('app.current_tenant_id', true), '')::uuid
+  );

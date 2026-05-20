@@ -10,8 +10,7 @@ import { exportProcessor } from "./exportGeneration";
 import type { ExportGenerationJob } from "../queues";
 
 const databaseUrl = process.env.DATABASE_URL;
-const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;
-const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;
+const describeWithDatabase = databaseUrl ? describe : describe.skip;
 
 async function createExportFixture(): Promise<{ tenantId: string; userId: string }> {
   const suffix = crypto.randomUUID().slice(0, 8);
