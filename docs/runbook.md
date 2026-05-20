@@ -10,6 +10,18 @@ This runbook is the operator-facing stub for BroSolution / Operational Grosir pr
 - Billing target: Midtrans and Xendit must both be supported. An admin-selected active PSP is attempted first; if that provider is configured incompletely or fails provider readiness checks, runtime billing must fall back to the other configured provider.
 - Auth hardening target: HTTP-only cookie/session storage. Do not continue expanding localStorage token patterns in P3+ work.
 
+## Shared infrastructure
+
+PostgreSQL, Redis, and MinIO are **not** bundled in this repo's Docker Compose files. They are provisioned externally by the instance owner and shared across multiple apps. This repo only consumes them via `.env`.
+
+The instance owner is responsible for:
+- The PostgreSQL database and the single owning DB role (referenced by `DATABASE_URL`).
+- The Redis instance and the ACL that restricts this app's keys to the `<APP_NAMESPACE>:*` prefix (referenced by `REDIS_URL` and `APP_NAMESPACE`).
+- The MinIO bucket for backups (referenced by `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, and `MINIO_BUCKET`).
+- The external Docker network named by `SHARED_NETWORK`, which must be pre-created before `docker compose up`.
+
+Because `api` and `worker` no longer have a `depends_on` on bundled Postgres/Redis services, they may start before the shared services are reachable. The application relies on connection-layer retry (pool reconnect, BullMQ backoff). Operators should verify shared-instance health independently before deploying app containers.
+
 ## Secrets rotation
 
 ### Rotation rules
@@ -59,10 +71,10 @@ Use this for `MFA_KMS_KEY`.
 ### Database password
 
 1. Put the app into a maintenance window if production traffic cannot tolerate reconnect errors.
-2. Connect as a Postgres superuser:
+2. Connect to the shared Postgres instance directly (coordinate with the instance owner for superuser access):
 
    ```bash
-   docker compose -f docker-compose.prod.yml exec db psql -U postgres
+   psql "$DATABASE_URL"
    ```
 
 3. Rotate the app user password:
@@ -71,7 +83,7 @@ Use this for `MFA_KMS_KEY`.
    ALTER USER app WITH PASSWORD 'new-password';
    ```
 
-4. Update `DATABASE_URL` in the production environment.
+4. Update `DATABASE_URL` in the production environment with the new credentials.
 5. Restart API and worker services.
 6. Validate `/readyz` and run a read/write smoke test against a non-critical tenant record.
 
@@ -108,10 +120,10 @@ Rotate one provider at a time.
 
 ### Backup object storage secrets
 
-Use this for `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY`, and `BACKUP_S3_SECRET_KEY`.
+Use this for `MINIO_ENDPOINT`, `MINIO_BUCKET`, `MINIO_ACCESS_KEY`, and `MINIO_SECRET_KEY`. The backup script reads these vars and falls back to legacy `BACKUP_S3_*` aliases for any existing overrides.
 
-1. Create a new object-storage access key with least privilege for the backup bucket/prefix.
-2. Update backup environment values.
+1. Create a new MinIO access key with least privilege for the backup bucket (coordinate with the instance owner as MinIO is shared).
+2. Update `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY` (and `MINIO_ENDPOINT`/`MINIO_BUCKET` if those changed) in the production environment.
 3. Run a backup dry-run and restore dry-run before revoking the old key.
 4. Confirm the new object has expected encryption, retention, and lifecycle policy.
 
@@ -197,7 +209,8 @@ Staging validation checklist:
 - Web home page and `/healthz`/`/readyz` return 200.
 - Platform admin login works using HTTP-only secure cookies; browser storage does not contain access/refresh tokens.
 - One tenant-scoped read path works.
-- `docker compose ... ps` shows `api`, `web`, `worker`, `db`, `redis`, and `caddy` healthy/running.
+- `docker compose ... ps` shows `api`, `web`, `worker`, and `caddy` healthy/running (`db` and `redis` are external shared services, not compose-managed).
+- Verify the shared Postgres, Redis, and MinIO instances are reachable independently before deploying app containers.
 - Billing readiness shows the admin-selected PSP and fallback PSP state. Verify both Midtrans and Xendit sandbox configuration before selecting either provider as active.
 
 ### Production deploy
@@ -300,18 +313,19 @@ Backups are custom-format `pg_dump` artifacts uploaded to S3-compatible object s
 
 ### Required backup environment
 
-- `DATABASE_URL`: source Postgres URL.
-- `BACKUP_S3_ENDPOINT`: S3-compatible endpoint, for example R2, Wasabi, DigitalOcean Spaces, or AWS S3.
-- `BACKUP_S3_BUCKET`: target bucket.
-- `BACKUP_S3_PREFIX`: optional prefix, defaults to bucket root; use `db` in production.
-- `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY`: optional aliases for AWS CLI credentials.
-- `BACKUP_S3_REGION`: optional, defaults to `auto`.
+- `DATABASE_URL`: source Postgres URL (shared external instance).
+- `MINIO_ENDPOINT`: MinIO S3-compatible endpoint (shared external instance provisioned by the instance owner).
+- `MINIO_BUCKET`: target bucket (provisioned by the instance owner).
+- `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY`: credentials for the shared MinIO instance.
+- `APP_NAMESPACE`: used as the object-name prefix for backup artifacts so they are namespaced per app.
 - `BACKUP_RETENTION_DAYS`: optional retention window. Set `0` or unset to disable script-side pruning if bucket lifecycle policies own retention.
+
+The backup script falls back to legacy `BACKUP_S3_ENDPOINT` / `BACKUP_S3_BUCKET` / `BACKUP_S3_ACCESS_KEY` / `BACKUP_S3_SECRET_KEY` aliases when the `MINIO_*` vars are not set.
 
 ### Backup checklist
 
 1. Confirm `pg_dump`, `aws`, and `sha256sum` are installed on the backup runner.
-2. Confirm `BACKUP_S3_*`, `DATABASE_URL`, and `BACKUP_RETENTION_DAYS` are configured.
+2. Confirm `MINIO_ENDPOINT`, `MINIO_BUCKET`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `DATABASE_URL`, `APP_NAMESPACE`, and `BACKUP_RETENTION_DAYS` are configured.
 3. Run backup from the production host or backup runner:
 
    ```bash
@@ -388,11 +402,11 @@ Run restore drills in staging or an isolated restore database only.
    curl --fail --silent --show-error --max-time 15 https://brosolution.id/readyz
    ```
 
-4. Check database, Redis, queue depth, and billing provider status:
+4. Check database, Redis, queue depth, and billing provider status (Postgres and Redis are external — connect directly, not via `docker compose exec`):
 
    ```bash
-   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod exec -T db pg_isready
-   docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod exec -T redis redis-cli ping
+   psql "$DATABASE_URL" -c "SELECT 1;" 2>&1 | head -3
+   redis-cli -u "$REDIS_URL" ping
    docker compose --env-file .env.prod -f docker-compose.prod.yml --profile prod logs --tail=200 worker | grep -Ei 'queue|bull|billing|webhook' || true
    ```
 
