@@ -77,6 +77,7 @@ export TEST_S3_ROOT="$WORK/s3"
 export DATABASE_URL="postgres://app:test@db:5432/app"
 export MINIO_ENDPOINT="https://s3.example.test"
 export MINIO_BUCKET="test-bucket"
+export APP_NAMESPACE="brosolution"
 export BACKUP_S3_PREFIX="db"
 export BACKUP_TMP_DIR="$WORK/tmp"
 export BACKUP_RETENTION_DAYS=1
