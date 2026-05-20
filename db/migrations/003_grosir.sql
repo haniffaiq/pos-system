@@ -7,11 +7,13 @@ alter table users
 create or replace function apply_tenant_rls(tbl regclass) returns void as $$
 begin
   execute format('alter table %s enable row level security', tbl);
+  execute format('alter table %s force row level security', tbl);
   execute format(
     'create policy tenant_isolation on %s
-       using (tenant_id = nullif(current_setting(''app.current_tenant_id'', true), '''')::uuid)
-       with check (tenant_id = nullif(current_setting(''app.current_tenant_id'', true), '''')::uuid)', tbl);
-  execute format('grant select, insert, update, delete on %s to app', tbl);
+       using (current_setting(''app.platform_mode'', true) = ''on''
+              or tenant_id = nullif(current_setting(''app.current_tenant_id'', true), '''')::uuid)
+       with check (current_setting(''app.platform_mode'', true) = ''on''
+              or tenant_id = nullif(current_setting(''app.current_tenant_id'', true), '''')::uuid)', tbl);
 end $$ language plpgsql;
 
 create table categories (

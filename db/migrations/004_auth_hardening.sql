@@ -15,13 +15,17 @@ create table if not exists user_mfa (
 );
 
 alter table user_mfa enable row level security;
+alter table user_mfa force row level security;
 
 create policy user_mfa_self on user_mfa
-  using (user_id = nullif(current_setting('app.current_user_id', true), '')::uuid)
-  with check (user_id = nullif(current_setting('app.current_user_id', true), '')::uuid);
-
-grant select, insert, update, delete on user_mfa to app;
-grant all on user_mfa to app_admin;
+  using (
+    current_setting('app.platform_mode', true) = 'on'
+    or user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
+  )
+  with check (
+    current_setting('app.platform_mode', true) = 'on'
+    or user_id = nullif(current_setting('app.current_user_id', true), '')::uuid
+  );
 
 create table if not exists platform_admin_mfa (
   admin_id uuid not null references platform_admins(id) on delete cascade,
@@ -37,13 +41,17 @@ create table if not exists platform_admin_mfa (
 );
 
 alter table platform_admin_mfa enable row level security;
+alter table platform_admin_mfa force row level security;
 
 create policy platform_admin_mfa_self on platform_admin_mfa
-  using (admin_id = nullif(current_setting('app.current_admin_id', true), '')::uuid)
-  with check (admin_id = nullif(current_setting('app.current_admin_id', true), '')::uuid);
-
-grant select, insert, update, delete on platform_admin_mfa to app;
-grant all on platform_admin_mfa to app_admin;
+  using (
+    current_setting('app.platform_mode', true) = 'on'
+    or admin_id = nullif(current_setting('app.current_admin_id', true), '')::uuid
+  )
+  with check (
+    current_setting('app.platform_mode', true) = 'on'
+    or admin_id = nullif(current_setting('app.current_admin_id', true), '')::uuid
+  );
 
 create table if not exists refresh_token_blacklist (
   jti text primary key,
@@ -66,5 +74,3 @@ create index if not exists idx_refresh_blacklist_admin
   on refresh_token_blacklist(admin_id, expires_at)
   where admin_id is not null;
 
-grant select, insert, update, delete on refresh_token_blacklist to app;
-grant all on refresh_token_blacklist to app_admin;

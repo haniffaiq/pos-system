@@ -43,7 +43,7 @@ describe("006 billing migration", () => {
   it("protects tenant-owned billing tables with RLS and grants plan reads", () => {
     const migration = sql();
 
-    expect(migration).toContain("grant select on plans to app");
+    expect(migration).not.toContain("to app");
     expect(migration).toContain("select apply_tenant_rls('subscriptions')");
     expect(migration).toContain("select apply_tenant_rls('invoices')");
     expect(migration).toContain("select apply_tenant_rls('usage_counters')");

@@ -8,13 +8,11 @@ const devSeedPath = resolve(__dirname, "../../../../db/seeds/dev_seed.sql");
 describe("002 users RLS migration", () => {
   const sql = () => readFileSync(usersMigrationPath, "utf8");
 
-  it("creates app_admin as a login role that bypasses RLS", () => {
+  it("does not provision cluster-global roles (shared instance owner does that)", () => {
     const migration = sql();
 
-    expect(migration).toContain("create role app_admin login password 'admin_dev_pw' bypassrls");
-    expect(migration).toContain("alter role app_admin with login password 'admin_dev_pw' bypassrls");
-    expect(migration).toContain("grant all on all tables in schema public to app_admin");
-    expect(migration).toContain("alter default privileges in schema public grant all on tables to app_admin");
+    expect(migration).not.toContain("create role");
+    expect(migration).not.toContain("app_admin");
   });
 
   it("creates a tenant-scoped users table with tenant-local email uniqueness", () => {
@@ -31,10 +29,11 @@ describe("002 users RLS migration", () => {
     const migration = sql();
 
     expect(migration).toContain("alter table users enable row level security");
+    expect(migration).toContain("alter table users force row level security");
     expect(migration).toContain("create policy users_tenant_isolation on users");
-    expect(migration).toContain("using (tenant_id = nullif(current_setting('app.current_tenant_id', true), '')::uuid)");
-    expect(migration).toContain("with check (tenant_id = nullif(current_setting('app.current_tenant_id', true), '')::uuid)");
-    expect(migration).toContain("grant select, insert, update, delete on users to app");
+    expect(migration).toContain("current_setting('app.platform_mode', true) = 'on'");
+    expect(migration).toContain("or tenant_id = nullif(current_setting('app.current_tenant_id', true), '')::uuid");
+    expect(migration).not.toContain("to app");
   });
 });
 

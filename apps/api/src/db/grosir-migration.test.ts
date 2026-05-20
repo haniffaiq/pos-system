@@ -36,8 +36,10 @@ describe("003 grosir migration", () => {
 
     expect(migration).toContain("create or replace function apply_tenant_rls(tbl regclass) returns void");
     expect(migration).toContain("alter table %s enable row level security");
-    expect(migration).toContain("using (tenant_id = nullif(current_setting(''app.current_tenant_id'', true), '''')::uuid)");
-    expect(migration).toContain("with check (tenant_id = nullif(current_setting(''app.current_tenant_id'', true), '''')::uuid)");
+    expect(migration).toContain("alter table %s force row level security");
+    expect(migration).toContain("current_setting(''app.platform_mode'', true) = ''on''");
+    expect(migration).toContain("tenant_id = nullif(current_setting(''app.current_tenant_id'', true), '''')::uuid");
+    expect(migration).not.toContain("to app");
     for (const table of TABLES) {
       expect(migration).toContain(`select apply_tenant_rls('${table}')`);
     }

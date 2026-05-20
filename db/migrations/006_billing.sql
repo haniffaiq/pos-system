@@ -13,8 +13,6 @@ create table plans (
   updated_at timestamptz not null default now()
 );
 
-grant select on plans to app;
-
 create table subscriptions (
   id uuid primary key default uuid_v7(),
   tenant_id uuid not null references tenants(id) on delete cascade,
