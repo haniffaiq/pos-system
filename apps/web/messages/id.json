@@ -12,6 +12,16 @@
     "homeAria": "Beranda BroSolution",
     "sectionsAria": "Navigasi marketing"
   },
+  "findTenant": {
+    "eyebrow": "Akses Tenant",
+    "title": "Cari Tenant",
+    "subtitle": "Masukkan kode tenant (slug) toko kamu untuk lanjut ke halaman login.",
+    "label": "Kode tenant",
+    "placeholder": "mis. toko-saya",
+    "submit": "Lanjut ke Login",
+    "errorEmpty": "Masukkan kode tenant terlebih dahulu.",
+    "back": "← Kembali ke beranda"
+  },
   "hero": {
     "title": "Kelola Grosirmu Lebih Cepat",
     "subtitle": "POS, stok, dan laporan dalam satu platform. Dirancang untuk grosir Indonesia.",

@@ -12,6 +12,16 @@
     "homeAria": "BroSolution home",
     "sectionsAria": "Marketing navigation"
   },
+  "findTenant": {
+    "eyebrow": "Tenant access",
+    "title": "Find Tenant",
+    "subtitle": "Enter your store's tenant code (slug) to continue to its login page.",
+    "label": "Tenant code",
+    "placeholder": "e.g. my-store",
+    "submit": "Continue to login",
+    "errorEmpty": "Enter a tenant code first.",
+    "back": "← Back to home"
+  },
   "hero": {
     "title": "Run Your Wholesale Faster",
     "subtitle": "POS, inventory, and reports in one platform. Built for Indonesian wholesale.",
