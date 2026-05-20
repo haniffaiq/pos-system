@@ -20,4 +20,4 @@ or explicitly:
 REDIS_URL=redis://localhost:6379 pnpm --filter @app/api test:redis
 ```
 
-Postgres-backed tests continue to require both `DATABASE_URL` and `DATABASE_ADMIN_URL`; auth service integration tests require those plus `REDIS_URL`.
+Postgres-backed tests require `DATABASE_URL`; auth service integration tests require that plus `REDIS_URL`.
