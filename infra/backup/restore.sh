@@ -32,9 +32,9 @@ s3_uri() {
   if [[ "$key" == s3://* ]]; then
     echo "$key"
   elif [[ -n "${BACKUP_S3_PREFIX:-}" ]]; then
-    echo "s3://${BACKUP_S3_BUCKET}/${BACKUP_S3_PREFIX%/}/${key}"
+    echo "s3://${S3_BUCKET}/${BACKUP_S3_PREFIX%/}/${key}"
   else
-    echo "s3://${BACKUP_S3_BUCKET}/${key}"
+    echo "s3://${S3_BUCKET}/${key}"
   fi
 }
 
@@ -43,6 +43,18 @@ basename_from_key() {
   key="${key#s3://}"
   echo "${key##*/}"
 }
+
+# Resolve MinIO/S3 config: prefer MINIO_* (shared instance), fall back to legacy BACKUP_S3_*.
+S3_ENDPOINT="${MINIO_ENDPOINT:-${BACKUP_S3_ENDPOINT:-}}"
+S3_BUCKET="${MINIO_BUCKET:-${BACKUP_S3_BUCKET:-}}"
+S3_ACCESS_KEY="${MINIO_ACCESS_KEY:-${BACKUP_S3_ACCESS_KEY:-}}"
+S3_SECRET_KEY="${MINIO_SECRET_KEY:-${BACKUP_S3_SECRET_KEY:-}}"
+S3_REGION="${BACKUP_S3_REGION:-auto}"
+
+# MINIO_ENDPOINT may be scheme-less (e.g. minio:9000); aws --endpoint-url needs a scheme.
+if [[ -n "$S3_ENDPOINT" && "$S3_ENDPOINT" != http://* && "$S3_ENDPOINT" != https://* ]]; then
+  S3_ENDPOINT="http://${S3_ENDPOINT}"
+fi
 
 main() {
   local force_production=0
@@ -64,16 +76,16 @@ main() {
   fi
 
   local key="$1"
-  require_env BACKUP_S3_ENDPOINT
-  require_env BACKUP_S3_BUCKET
+  [[ -n "$S3_ENDPOINT" ]] || { echo "missing required env: MINIO_ENDPOINT (or BACKUP_S3_ENDPOINT)" >&2; exit 64; }
+  [[ -n "$S3_BUCKET" ]] || { echo "missing required env: MINIO_BUCKET (or BACKUP_S3_BUCKET)" >&2; exit 64; }
   require_cmd aws
   require_cmd sha256sum
   require_cmd pg_restore
   require_cmd psql
 
-  export AWS_ACCESS_KEY_ID="${BACKUP_S3_ACCESS_KEY:-${AWS_ACCESS_KEY_ID:-}}"
-  export AWS_SECRET_ACCESS_KEY="${BACKUP_S3_SECRET_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
-  export AWS_DEFAULT_REGION="${BACKUP_S3_REGION:-${AWS_DEFAULT_REGION:-auto}}"
+  export AWS_ACCESS_KEY_ID="${S3_ACCESS_KEY:-${AWS_ACCESS_KEY_ID:-}}"
+  export AWS_SECRET_ACCESS_KEY="${S3_SECRET_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
+  export AWS_DEFAULT_REGION="${S3_REGION:-${AWS_DEFAULT_REGION:-auto}}"
 
   local target_url="${RESTORE_DATABASE_URL:-}"
   if [[ -z "$target_url" ]]; then
@@ -95,8 +107,8 @@ main() {
 
   trap 'rm -f "${dump:-}" "${checksum:-}"' EXIT
 
-  aws --endpoint-url="$BACKUP_S3_ENDPOINT" s3 cp "$(s3_uri "$key")" "$dump"
-  if aws --endpoint-url="$BACKUP_S3_ENDPOINT" s3 cp "$(s3_uri "${key}.sha256")" "$checksum"; then
+  aws --endpoint-url="$S3_ENDPOINT" s3 cp "$(s3_uri "$key")" "$dump"
+  if aws --endpoint-url="$S3_ENDPOINT" s3 cp "$(s3_uri "${key}.sha256")" "$checksum"; then
     (cd "$tmp_dir" && sha256sum --check "$(basename "$checksum")")
   else
     echo "warning: checksum object missing; continuing without SHA256 verification" >&2
