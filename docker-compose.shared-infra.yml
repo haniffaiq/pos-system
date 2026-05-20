@@ -80,6 +80,9 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        # Baked into the client bundle — must be the public API origin.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     restart: unless-stopped
     command: ["node", "apps/web/server.js"]
     env_file:

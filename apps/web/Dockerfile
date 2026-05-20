@@ -10,6 +10,12 @@ RUN pnpm install --frozen-lockfile --filter @app/web...
 
 COPY packages packages
 COPY apps/web apps/web
+
+# NEXT_PUBLIC_* values are inlined into the client bundle at build time, so
+# the public API origin must be supplied as a build arg (not just runtime).
+ARG NEXT_PUBLIC_API_URL=""
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN pnpm --filter @app/web build
 
 FROM node:22-slim AS run
