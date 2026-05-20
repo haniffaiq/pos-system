@@ -765,6 +765,78 @@ git commit -m "docs: shared-instance env and operations"
 
 ---
 
+## Task 9: CI workflow and e2e seed scripts
+
+`.github/workflows/ci.yml` and the `e2e/*.sh` seed scripts still reference the removed `DATABASE_ADMIN_URL` / two-role model. CI runs its own ephemeral Postgres (not the shared instance), but it must mirror the single-role + forced-RLS model so the RLS isolation tests are meaningful: the CI `DATABASE_URL` role must be a non-superuser that owns the database (superusers always bypass RLS, even FORCED).
+
+**Files:**
+- Modify: `.github/workflows/ci.yml`
+- Modify: `e2e/seed-quota.sh`
+- Modify: `e2e/seed-grosir.sh`
+
+- [ ] **Step 1: Update `ci.yml` env block**
+
+In the `verify` job `env:` block: delete the `DATABASE_ADMIN_URL:` line. Keep `DATABASE_URL: postgres://app:app_password@localhost:5432/operational`. Replace the `BULLMQ_QUEUE_PREFIX: ci-${{ github.run_id }}-${{ github.run_attempt }}` line with `APP_NAMESPACE: ci-${{ github.run_id }}-${{ github.run_attempt }}`.
+
+- [ ] **Step 2: Simplify the "Prepare database roles" step in `ci.yml`**
+
+Replace the heredoc SQL in the `Prepare database roles` step with a single-role version — one non-superuser `app` role that owns the database and schema:
+
+```sql
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app') THEN
+    CREATE ROLE app LOGIN PASSWORD 'app_password' NOSUPERUSER NOBYPASSRLS;
+  END IF;
+END
+$$;
+ALTER ROLE app WITH LOGIN PASSWORD 'app_password' NOSUPERUSER NOBYPASSRLS;
+ALTER DATABASE operational OWNER TO app;
+ALTER SCHEMA public OWNER TO app;
+GRANT ALL PRIVILEGES ON DATABASE operational TO app;
+GRANT ALL PRIVILEGES ON SCHEMA public TO app;
+```
+
+(`app` is non-superuser and non-bypassrls so FORCED RLS applies to it; it owns the schema so `pnpm migrate`, which connects as `app`, can run DDL.)
+
+- [ ] **Step 3: Update `e2e/seed-quota.sh`**
+
+Replace the env guard:
+
+```bash
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "DATABASE_URL is required to seed quota e2e tenants" >&2
+  exit 1
+fi
+```
+
+The `psql` invocation inserts into RLS-protected tables (`tenants`, `users`, `units`, `subscriptions`, `products`, `usage_counters`), so it must run in platform mode. Change `psql "$DATABASE_ADMIN_URL" --set ON_ERROR_STOP=1 \` to:
+
+```bash
+PGOPTIONS='-c app.platform_mode=on' psql "$DATABASE_URL" --set ON_ERROR_STOP=1 \
+```
+
+- [ ] **Step 4: Update `e2e/seed-grosir.sh`**
+
+Change line `if [ -n "${DATABASE_ADMIN_URL:-}" ]; then` to `if [ -n "${DATABASE_URL:-}" ]; then`.
+
+- [ ] **Step 5: Validate**
+
+Run: `git grep -n "DATABASE_ADMIN_URL\|BULLMQ_QUEUE_PREFIX" -- .github e2e`
+Expected: no matches.
+
+Run: `bash -n e2e/seed-quota.sh && bash -n e2e/seed-grosir.sh && echo "shell syntax ok"`
+Expected: `shell syntax ok`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add .github/workflows/ci.yml e2e/seed-quota.sh e2e/seed-grosir.sh
+git commit -m "ci: single-role Postgres setup and APP_NAMESPACE"
+```
+
+---
+
 ## Final verification
 
 - [ ] **Step 1: Full test suite**
