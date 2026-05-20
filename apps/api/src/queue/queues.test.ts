@@ -70,6 +70,7 @@ describeWithRedis("queues", () => {
     await dunningQueue?.close();
     await purgeRefreshBlacklistQueue?.close();
     await cleanupQueueKeys();
+    // Importing ../lib/redis opens both clients; quit them so Vitest workers exit cleanly.
     await redis?.quit();
     await bullConnection?.quit();
   });
