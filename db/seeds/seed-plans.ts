@@ -76,12 +76,15 @@ export async function seedPlans(pool: Pool) {
 }
 
 async function main() {
-  if (!process.env.DATABASE_ADMIN_URL) {
-    console.error("DATABASE_ADMIN_URL is required to seed billing plans");
+  if (!process.env.DATABASE_URL) {
+    console.error("DATABASE_URL is required to seed billing plans");
     process.exit(1);
   }
 
-  const pool = new Pool({ connectionString: process.env.DATABASE_ADMIN_URL });
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    options: "-c app.platform_mode=on",
+  });
   try {
     await seedPlans(pool);
     console.log("billing plans seeded: free, pro, business");
