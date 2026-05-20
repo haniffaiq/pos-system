@@ -837,6 +837,45 @@ git commit -m "ci: single-role Postgres setup and APP_NAMESPACE"
 
 ---
 
+## Task 10: Remaining DATABASE_ADMIN_URL test gates
+
+Task 3 updated 5 DB-integration test files under `apps/api/src/db/`, but 15 more integration tests across `services/`, `modules/grosir/`, and `queue/jobs/` also gate on `DATABASE_ADMIN_URL`. With that env var removed they would permanently `describe.skip` in CI — including `grosir-rls.test.ts`, the tenant-isolation proof. They must gate on `DATABASE_URL` only.
+
+**Files (14 with the uniform pattern):** `apps/api/src/modules/grosir/{adjustments,dashboard,masterdata,notifications,products,reports,sales,stockin}.service.test.ts`, `apps/api/src/modules/grosir/{grosir-rls,stock}.test.ts`, `apps/api/src/queue/jobs/{exportGeneration,lowStockScan,provisioning}.test.ts`, `apps/api/src/services/tenant.service.test.ts`.
+
+**Plus 1 with a different pattern:** `apps/api/src/services/auth.service.test.ts`.
+
+**Plus a stale comment:** `apps/api/src/db/withTenant.ts`.
+
+- [ ] **Step 1: Fix the 14 uniform-pattern files**
+
+In each of the 14 files, delete the line `const databaseAdminUrl = process.env.DATABASE_ADMIN_URL;` and change `const describeWithDatabase = databaseUrl && databaseAdminUrl ? describe : describe.skip;` to `const describeWithDatabase = databaseUrl ? describe : describe.skip;`.
+
+- [ ] **Step 2: Fix `auth.service.test.ts`**
+
+Change `const hasAuthInfra = Boolean(process.env.DATABASE_URL && process.env.DATABASE_ADMIN_URL && process.env.REDIS_URL);` to `const hasAuthInfra = Boolean(process.env.DATABASE_URL && process.env.REDIS_URL);`.
+
+- [ ] **Step 3: Fix the stale `withTenant.ts` comment**
+
+In `apps/api/src/db/withTenant.ts`, the JSDoc on `withAdmin` reads `/** Run a callback against the BYPASSRLS admin pool (platform-level queries). */`. Change it to `/** Run a callback against the platform-mode admin pool (app.platform_mode=on; bypasses RLS policies). */`.
+
+- [ ] **Step 4: Verify**
+
+Run: `git grep -n "DATABASE_ADMIN_URL" -- 'apps' 'db'`
+Expected: no matches.
+
+Run: `pnpm --filter @app/api test` and `pnpm --filter @app/api exec tsc -p tsconfig.json --noEmit`
+Expected: both PASS — DB-gated suites skip cleanly without `DATABASE_URL`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/api/src
+git commit -m "test: gate remaining integration tests on DATABASE_URL only"
+```
+
+---
+
 ## Final verification
 
 - [ ] **Step 1: Full test suite**
